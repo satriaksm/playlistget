@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlaylistGet — Download YouTube & Spotify Playlists as MP3/MP4</title>
+  <meta name="description" content="PlaylistGet is a free online tool to download YouTube videos, YouTube Music, and Spotify tracks or playlists as MP3 audio or MP4 video. Batch download entire playlists in one click with selectable quality." />
+  <meta name="keywords" content="youtube playlist downloader, download youtube playlist, youtube to mp3, youtube to mp4, spotify playlist downloader, batch download youtube, youtube music downloader, free playlist downloader, download playlist as mp3, download playlist as mp4" />
+  <meta name="author" content="PlaylistGet" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="/" />
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="PlaylistGet — Download YouTube & Spotify Playlists" />
+  <meta property="og:description" content="Free tool to batch download YouTube videos, YouTube Music, and Spotify tracks or playlists as MP3 or MP4 with selectable quality." />
+  <meta property="og:site_name" content="PlaylistGet" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="PlaylistGet — Download YouTube & Spotify Playlists" />
+  <meta name="twitter:description" content="Free tool to batch download YouTube, YouTube Music, and Spotify playlists as MP3 or MP4." />
+
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "PlaylistGet",
+    "description": "Free online tool to download YouTube videos, YouTube Music, and Spotify tracks or playlists as MP3 audio or MP4 video. Supports batch downloading entire playlists with selectable quality.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "All",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "Download YouTube playlists",
+      "Download single YouTube videos",
+      "Download Spotify tracks and playlists",
+      "Convert to MP3 with selectable bitrate (128k-320k)",
+      "Download as MP4 with selectable resolution (480p-1080p)",
+      "Batch download with progress tracking"
+    ]
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Animated background -->
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <img src="logo.png" alt="PlaylistGet Logo" class="logo-image" />
+        <div>
+          <h1 class="logo-text">Playlist<span class="accent">Get</span></h1>
+          <p class="logo-sub">Media Downloader</p>
+        </div>
+      </div>
+      <div class="header-status" id="systemStatus">
+        <div class="status-dot"></div>
+        <span>Checking system...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Input Section -->
+      <section class="input-section" id="inputSection">
+        <div class="section-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          STEP 1
+        </div>
+        <h2 class="section-title">Paste URL</h2>
+        <p class="section-desc">Supports YouTube, YouTube Music, and Spotify (Single Media or Playlist)</p>
+
+        <div class="input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+            <input
+              type="url"
+              id="playlistUrl"
+              placeholder="https://www.youtube.com/playlist?list=..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button class="btn-paste" id="pasteBtn" title="Paste from clipboard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          </div>
+          <button class="btn-primary" id="fetchBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span>Fetch</span>
+          </button>
+        </div>
+
+        <!-- Quick examples -->
+        <div class="examples">
+          <span class="examples-label">Supported:</span>
+          <span class="example-tag">youtube.com/watch?v=...</span>
+          <span class="example-tag">youtube.com/playlist?list=...</span>
+          <span class="example-tag">open.spotify.com/track/...</span>
+          <span class="example-tag">open.spotify.com/playlist/...</span>
+        </div>
+      </section>
+
+      <!-- Loading State -->
+      <section class="loading-section hidden" id="loadingSection">
+        <div class="loader">
+          <div class="loader-ring"></div>
+          <div class="loader-ring"></div>
+          <div class="loader-ring"></div>
+        </div>
+        <p class="loading-text">Fetching playlist information...</p>
+        <p class="loading-sub">This may take a moment for large playlists</p>
+      </section>
+
+      <!-- Error State -->
+      <section class="error-section hidden" id="errorSection">
+        <div class="error-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+        </div>
+        <p class="error-text" id="errorText">Something went wrong</p>
+        <button class="btn-secondary" id="retryBtn">Try Again</button>
+      </section>
+
+      <!-- Playlist Results -->
+      <section class="results-section hidden" id="resultsSection">
+        <!-- Playlist Header -->
+        <div class="playlist-header">
+          <div class="playlist-info">
+            <div class="section-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              STEP 2
+            </div>
+            <h2 class="section-title" id="playlistTitle">Playlist Title</h2>
+            <p class="playlist-meta">
+              <span id="videoCount">0</span> videos •
+              <span id="selectedCount">0</span> selected
+            </p>
+          </div>
+          <div class="playlist-actions">
+            <button class="btn-icon" id="selectAllBtn" title="Select All">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <polyline points="9 11 12 14 22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </button>
+            <button class="btn-icon" id="deselectAllBtn" title="Deselect All">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Video List -->
+        <div class="video-list" id="videoList"></div>
+
+        <!-- Download Options -->
+        <div class="download-panel" id="downloadPanel">
+          <div class="download-options">
+            <div class="format-group">
+              <label class="format-label">Format</label>
+              <div class="format-selector">
+                <button class="format-btn active" data-format="mp3" id="formatMp3">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                  MP3 Audio
+                </button>
+                <button class="format-btn" data-format="mp4" id="formatMp4">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                    <line x1="7" y1="2" x2="7" y2="22" />
+                    <line x1="17" y1="2" x2="17" y2="22" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <line x1="2" y1="7" x2="7" y2="7" />
+                    <line x1="2" y1="17" x2="7" y2="17" />
+                    <line x1="17" y1="7" x2="22" y2="7" />
+                    <line x1="17" y1="17" x2="22" y2="17" />
+                  </svg>
+                  MP4 Video
+                </button>
+              </div>
+            </div>
+            <div class="quality-group hidden" id="qualityGroup">
+              <label class="format-label">Quality</label>
+              <select class="quality-select" id="qualitySelect">
+                <!-- Managed by JS -->
+              </select>
+            </div>
+          </div>
+          <button class="btn-download" id="downloadBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Download Selected (<span id="downloadCount">0</span>)</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Download Progress -->
+      <section class="progress-section hidden" id="progressSection">
+        <div class="section-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          PROCESSING
+        </div>
+        <h2 class="section-title">Processing Playlist</h2>
+
+        <div class="progress-container">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressBar"></div>
+          </div>
+          <div class="progress-stats">
+            <span id="progressPercent">0%</span>
+            <span id="progressCount">0 / 0</span>
+          </div>
+          <p class="progress-current" id="currentDownload">Preparing...</p>
+          <div class="progress-notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            Don't worry if it looks stuck, processing continues in the background.
+          </div>
+        </div>
+
+        <div class="progress-log" id="progressLog"></div>
+      </section>
+
+      <!-- Download Complete -->
+      <section class="complete-section hidden" id="completeSection">
+        <div class="complete-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+        </div>
+        <h2 class="section-title">Processing Complete!</h2>
+        <p class="complete-stats" id="completeStats">0 files processed successfully</p>
+
+        <div class="complete-errors hidden" id="completeErrors">
+          <p class="error-summary" id="errorSummary"></p>
+        </div>
+
+        <div class="complete-actions">
+          <button class="btn-download" id="downloadZipBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Download ZIP</span>
+          </button>
+          <button class="btn-secondary" id="newDownloadBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            Start New Download
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <!-- <p>Built with ❤️ using <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a> • For personal use only</p> -->
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
