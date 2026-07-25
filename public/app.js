@@ -375,20 +375,28 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch {
         // Ignore polling errors
       }
-    }, 1500);
+    }, 400);
   }
 
   function updateProgress(data) {
     const total = data.totalVideos || 0;
     const done = (data.completed || 0) + (data.failed || 0);
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    const overallPercent = data.progress !== undefined ? data.progress : (total > 0 ? Math.round((done / total) * 100) : 0);
+    const filePercent = data.currentProgress ? Math.round(data.currentProgress) : 0;
 
-    els.progressBar.style.width = `${percent}%`;
-    els.progressPercent.textContent = `${percent}%`;
+    els.progressBar.style.width = `${overallPercent}%`;
+    els.progressPercent.textContent = `${overallPercent}%`;
     els.progressCount.textContent = `${done} / ${total}`;
-    els.currentDownload.textContent = data.currentVideo
-      ? `Processing: ${data.currentVideo}`
-      : 'Processing...';
+
+    if (data.currentVideo) {
+      if (filePercent > 0 && filePercent < 100) {
+        els.currentDownload.textContent = `Downloading (${filePercent}%): ${data.currentVideo}`;
+      } else {
+        els.currentDownload.textContent = `Processing: ${data.currentVideo}`;
+      }
+    } else {
+      els.currentDownload.textContent = 'Processing...';
+    }
 
     // Update log
     updateLog(data);
@@ -480,8 +488,10 @@ document.addEventListener('DOMContentLoaded', () => {
       state.isDownloading = true;
       const data = state.downloadData;
       let url;
-      if (data.completed === 1 && data.files && data.files.length === 1) {
-        url = `/api/download-file/${state.sessionId}/${encodeURIComponent(data.files[0])}`;
+      const singleFile = data.completed === 1 && data.files && data.files.length === 1 ? data.files[0] : null;
+
+      if (singleFile) {
+        url = `/api/download-file/${state.sessionId}/${encodeURIComponent(singleFile)}`;
       } else {
         url = `/api/download-zip/${state.sessionId}`;
       }
@@ -489,7 +499,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // Use invisible <a> to trigger download without page navigation
       const a = document.createElement('a');
       a.href = url;
-      a.download = '';
+      if (singleFile) {
+        a.setAttribute('download', singleFile);
+      } else {
+        a.setAttribute('download', `playlist_${state.sessionId.substring(0, 8)}.zip`);
+      }
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();

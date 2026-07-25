@@ -141,10 +141,11 @@ app.post('/api/playlist', async (req, res) => {
     ];
 
     let customTitle = null;
+    let spotifyData = null;
 
     if (spotifyRegex.test(url)) {
       // Fetch Spotify metadata
-      const spotifyData = await spotifyUrlInfo.getData(url);
+      spotifyData = await spotifyUrlInfo.getData(url);
       
       if (spotifyData.type === 'track') {
         customTitle = `${spotifyData.name} - ${spotifyData.artists[0].name}`;
@@ -197,17 +198,51 @@ app.post('/api/playlist', async (req, res) => {
         // Extract title
         const playlistTitle = customTitle || entries[0].playlist_title || entries[0].playlist || entries[0].title || 'Unknown Playlist/Video';
 
-        const videos = entries.map((entry, index) => ({
-          id: entry.id || entry.url,
-          title: entry.title || `Video ${index + 1}`,
-          duration: entry.duration || null,
-          durationString: entry.duration_string || formatDuration(entry.duration),
-          thumbnail: entry.thumbnails?.[entry.thumbnails.length - 1]?.url
-            || `https://img.youtube.com/vi/${entry.id}/mqdefault.jpg`,
-          uploader: entry.uploader || entry.channel || 'Unknown',
-          url: entry.url || entry.webpage_url || `https://www.youtube.com/watch?v=${entry.id}`,
-          index: index + 1
-        }));
+        const videos = entries.map((entry, index) => {
+          let rawTitle = entry.title || `Video ${index + 1}`;
+          let rawUploader = entry.uploader || entry.channel || entry.artist || entry.creator || null;
+
+          if (spotifyData) {
+            if (spotifyData.type === 'track') {
+              rawTitle = spotifyData.name;
+              rawUploader = spotifyData.artists[0]?.name || rawUploader;
+            } else if (spotifyData.trackList && spotifyData.trackList[index]) {
+              rawTitle = spotifyData.trackList[index].title;
+              rawUploader = spotifyData.trackList[index].subtitle || rawUploader;
+            }
+          }
+
+          // If uploader is missing, attempt parsing "Artist - Title" from rawTitle
+          if (!rawUploader && rawTitle.includes(' - ')) {
+            const parts = rawTitle.split(' - ');
+            rawUploader = parts[0].trim();
+          }
+
+          // Clean uploader name (e.g. "Daniel Caesar - Topic" -> "Daniel Caesar")
+          const cleanArtist = rawUploader
+            ? rawUploader.replace(/\s*-\s*Topic$/i, '').replace(/\s*VEVO$/i, '').trim()
+            : null;
+
+          // Build display title as "Judul - Penyanyi" if not already present
+          let displayTitle = rawTitle;
+          if (cleanArtist && cleanArtist !== 'Unknown' && cleanArtist.toLowerCase() !== 'various artists') {
+            if (!rawTitle.toLowerCase().includes(cleanArtist.toLowerCase())) {
+              displayTitle = `${rawTitle} - ${cleanArtist}`;
+            }
+          }
+
+          return {
+            id: entry.id || entry.url,
+            title: displayTitle,
+            duration: entry.duration || null,
+            durationString: entry.duration_string || formatDuration(entry.duration),
+            thumbnail: entry.thumbnails?.[entry.thumbnails.length - 1]?.url
+              || `https://img.youtube.com/vi/${entry.id}/mqdefault.jpg`,
+            uploader: cleanArtist || 'Auto-detected on download',
+            url: entry.url || entry.webpage_url || `https://www.youtube.com/watch?v=${entry.id}`,
+            index: index + 1
+          };
+        });
 
         res.json({
           title: playlistTitle,
@@ -276,6 +311,7 @@ app.post('/api/download', (req, res) => {
     completed: 0,
     failed: 0,
     currentVideo: '',
+    currentProgress: 0,
     status: 'downloading',
     progress: 0,
     files: [],
@@ -303,9 +339,22 @@ app.get('/api/progress/:sessionId', (req, res) => {
   }
   const total = session.totalVideos || 0;
   const done = (session.completed || 0) + (session.failed || 0);
+  const currentProgress = session.currentProgress || 0;
+
+  let overallProgress = 0;
+  if (total > 0) {
+    if (session.status === 'completed') {
+      overallProgress = 100;
+    } else {
+      const fractionalDone = done + (currentProgress / 100);
+      overallProgress = Math.min(99, Math.round((fractionalDone / total) * 100));
+    }
+  }
+
   res.json({
     ...session,
-    progress: total > 0 ? Math.round((done / total) * 100) : 0
+    currentProgress,
+    progress: overallProgress
   });
 });
 
@@ -364,13 +413,89 @@ app.get('/api/download-file/:sessionId/:filename', (req, res) => {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  res.download(filePath, (err) => {
+  res.download(filePath, req.params.filename, (err) => {
     // Clean up after download finishes
     setTimeout(() => {
       cleanupSession(session.id);
     }, 120000); // 2 minutes to ensure browser finishes saving
   });
 });
+
+function formatTrackFilename(video) {
+  let title = (video.title || 'Track').trim();
+  let rawUploader = (video.uploader || video.artist || '').trim();
+
+  // Clean uploader: strip "- Topic", "VEVO", etc.
+  let cleanArtist = rawUploader
+    .replace(/\s*-\s*Topic$/i, '')
+    .replace(/\s*VEVO$/i, '')
+    .trim();
+
+  let formatted = title;
+
+  if (cleanArtist && cleanArtist !== 'Unknown' && cleanArtist.toLowerCase() !== 'various artists') {
+    const titleLower = title.toLowerCase();
+    const artistLower = cleanArtist.toLowerCase();
+
+    const containsArtist = titleLower.includes(artistLower);
+
+    if (!containsArtist) {
+      formatted = `${title} - ${cleanArtist}`;
+    }
+  }
+
+  // Remove invalid OS characters: \ / : * ? " < > |
+  let sanitized = formatted
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!sanitized || sanitized === '.' || sanitized === '..') {
+    sanitized = 'Track';
+  }
+
+  if (sanitized.length > 150) {
+    sanitized = sanitized.substring(0, 150).trim();
+  }
+
+  return sanitized;
+}
+
+function cleanDownloadedFilename(filename) {
+  const ext = path.extname(filename);
+  let name = path.basename(filename, ext);
+
+  // Strip "- Topic" and "VEVO"
+  name = name
+    .replace(/\s*-\s*Topic\b/gi, '')
+    .replace(/\s*VEVO\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Remove trailing generic NA / Unknown artist additions from yt-dlp template fallback
+  name = name.replace(/\s*-\s*(NA|Unknown)\b/gi, '').trim();
+
+  // If filename pattern is "Title - Artist - RecordLabel"
+  const parts = name.split(' - ').map(p => p.trim()).filter(Boolean);
+  if (parts.length >= 3) {
+    const lastPart = parts[parts.length - 1].toLowerCase();
+    if (lastPart.includes('music') || lastPart.includes('records') || lastPart.includes('entertainment') || lastPart.includes('official') || lastPart === 'unknown' || lastPart === 'na') {
+      parts.pop();
+      name = parts.join(' - ');
+    }
+  }
+
+  // Remove invalid OS characters: \ / : * ? " < > |
+  let sanitized = name
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!sanitized) sanitized = 'Track';
+  if (sanitized.length > 150) sanitized = sanitized.substring(0, 150).trim();
+
+  return `${sanitized}${ext}`;
+}
 
 // Download videos sequentially
 async function downloadVideos(session, videos, sessionDir, format, quality) {
@@ -387,11 +512,17 @@ async function downloadVideos(session, videos, sessionDir, format, quality) {
       if (session.status === 'cancelled') break;
       
       session.completed++;
-      session.downloadedTitles.push(video.title);
-
-      // Find the downloaded file
-      const files = fs.readdirSync(sessionDir);
-      session.files = files;
+      
+      // Update session files and downloaded titles
+      if (fs.existsSync(sessionDir)) {
+        const files = fs.readdirSync(sessionDir);
+        session.files = files;
+        if (files.length > 0) {
+          const latestFile = files[files.length - 1];
+          const cleanTitle = path.basename(latestFile, path.extname(latestFile));
+          session.downloadedTitles.push(cleanTitle);
+        }
+      }
       console.log(`  ✓ Success`);
     } catch (err) {
       if (session.status === 'cancelled') {
@@ -416,6 +547,8 @@ async function downloadVideos(session, videos, sessionDir, format, quality) {
 
 function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegAvailable) {
   return new Promise((resolve, reject) => {
+    session.currentProgress = 0;
+
     // Build the actual YouTube URL
     let videoUrl;
     if (video.url && video.url.startsWith('http')) {
@@ -429,10 +562,13 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     }
 
     // Count files before download to detect new files
-    const filesBefore = new Set(fs.readdirSync(outputDir));
+    let filesBefore = new Set();
+    if (fs.existsSync(outputDir)) {
+      filesBefore = new Set(fs.readdirSync(outputDir));
+    }
 
-    // Sanitize output template — use a safe filename pattern
-    const outputTemplate = path.join(outputDir, '%(title).100B.%(ext)s');
+    // Use yt-dlp metadata fields for title and artist/uploader/channel
+    const outputTemplate = path.join(outputDir, '%(title).100B - %(artist,uploader,channel)s.%(ext)s');
 
     let args = [
       '-o', outputTemplate,
@@ -487,11 +623,16 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     ytdlp.stdout.on('data', (data) => {
       const chunk = data.toString();
       stdout += chunk;
-      // Log download progress
+      // Log download progress and update session.currentProgress
       if (chunk.includes('[download]') && chunk.includes('%')) {
-        const match = chunk.match(/(\d+\.?\d*)%/);
-        if (match) {
-          process.stdout.write(`\r  Progress: ${match[1]}%`);
+        const matches = [...chunk.matchAll(/(\d+\.?\d*)%/g)];
+        if (matches.length > 0) {
+          const lastMatch = matches[matches.length - 1];
+          const pct = parseFloat(lastMatch[1]);
+          if (!isNaN(pct)) {
+            session.currentProgress = pct;
+            process.stdout.write(`\r  Progress: ${pct.toFixed(1)}%`);
+          }
         }
       }
     });
@@ -503,13 +644,40 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     ytdlp.on('close', (code) => {
       process.stdout.write('\n'); // Newline after progress
 
+      // Safety check: Ensure output directory still exists
+      if (!fs.existsSync(outputDir)) {
+        console.log(`  ⚠ Output directory no longer exists (cancelled or cleaned up).`);
+        resolve();
+        return;
+      }
+
       // PRIMARY CHECK: Did any new files appear in the output directory?
       const filesAfter = new Set(fs.readdirSync(outputDir));
       const newFiles = [...filesAfter].filter(f => !filesBefore.has(f) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
 
       if (newFiles.length > 0) {
-        // File was downloaded successfully regardless of exit code
         console.log(`  📁 New file(s): ${newFiles.join(', ')}`);
+        session.currentProgress = 100;
+
+        // Post-processing rename to clean up filename and ensure "Judul - Penyanyi" format
+        for (const downloadedFile of newFiles) {
+          const cleanedName = cleanDownloadedFilename(downloadedFile);
+          const currentPath = path.join(outputDir, downloadedFile);
+          const targetPath = path.join(outputDir, cleanedName);
+
+          if (currentPath !== targetPath) {
+            try {
+              if (fs.existsSync(targetPath)) {
+                fs.unlinkSync(targetPath);
+              }
+              fs.renameSync(currentPath, targetPath);
+              console.log(`  🏷 Cleaned & Renamed: "${downloadedFile}" -> "${cleanedName}"`);
+            } catch (renameErr) {
+              console.error(`  ⚠️ Could not rename file: ${renameErr.message}`);
+            }
+          }
+        }
+
         resolve();
         return;
       }
