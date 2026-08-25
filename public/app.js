@@ -40,6 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
     errorSummary: document.getElementById('errorSummary'),
     downloadZipBtn: document.getElementById('downloadZipBtn'),
     newDownloadBtn: document.getElementById('newDownloadBtn'),
+    playlistSearchInput: document.getElementById('playlistSearchInput'),
+    clearSearchBtn: document.getElementById('clearSearchBtn'),
+    searchCountBadge: document.getElementById('searchCountBadge'),
+    progressSpeed: document.getElementById('progressSpeed'),
+    progressEta: document.getElementById('progressEta'),
   };
 
   // State
@@ -51,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionId: null,
     pollingInterval: null,
     isDownloading: false,
+    searchQuery: '',
   };
 
   // ---- Initialize ----
@@ -107,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         els.playlistUrl.value = text;
         els.playlistUrl.focus();
       } catch {
-        // Fallback: focus input for manual paste
         els.playlistUrl.focus();
       }
     });
@@ -137,6 +142,24 @@ document.addEventListener('DOMContentLoaded', () => {
       updateVideoSelection();
     });
 
+    // Search filter input
+    if (els.playlistSearchInput) {
+      els.playlistSearchInput.addEventListener('input', (e) => {
+        state.searchQuery = e.target.value.toLowerCase().trim();
+        filterVideoList();
+      });
+    }
+
+    // Clear search filter
+    if (els.clearSearchBtn) {
+      els.clearSearchBtn.addEventListener('click', () => {
+        els.playlistSearchInput.value = '';
+        state.searchQuery = '';
+        filterVideoList();
+        els.playlistSearchInput.focus();
+      });
+    }
+
     // Format buttons
     els.formatMp3.addEventListener('click', () => setFormat('mp3'));
     els.formatMp4.addEventListener('click', () => setFormat('mp4'));
@@ -157,6 +180,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize format UI
     setFormat('mp3');
+
+    // Example tags click to auto-fill
+    document.querySelectorAll('.example-tag').forEach(tag => {
+      tag.addEventListener('click', () => {
+        const url = tag.dataset.url;
+        if (url) {
+          els.playlistUrl.value = url;
+          els.playlistUrl.focus();
+          els.playlistUrl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    });
+
+    // FAQ Accordion
+    document.querySelectorAll('.faq-item').forEach(item => {
+      const questionBtn = item.querySelector('.faq-question');
+      if (questionBtn) {
+        questionBtn.addEventListener('click', () => {
+          const isActive = item.classList.contains('active');
+          document.querySelectorAll('.faq-item').forEach(other => {
+            if (other !== item) {
+              other.classList.remove('active');
+              const btn = other.querySelector('.faq-question');
+              if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+          });
+          item.classList.toggle('active', !isActive);
+          questionBtn.setAttribute('aria-expanded', String(!isActive));
+        });
+      }
+    });
 
     // Handle interrupt / page unload
     window.addEventListener('beforeunload', () => {
@@ -216,10 +270,17 @@ document.addEventListener('DOMContentLoaded', () => {
     els.videoCount.textContent = data.count;
     els.videoList.innerHTML = '';
 
+    if (els.playlistSearchInput) els.playlistSearchInput.value = '';
+    state.searchQuery = '';
+    if (els.clearSearchBtn) els.clearSearchBtn.classList.add('hidden');
+    if (els.searchCountBadge) els.searchCountBadge.textContent = `Showing all ${data.count} tracks`;
+
     data.videos.forEach(video => {
       const item = document.createElement('div');
       item.className = 'video-item selected';
       item.dataset.id = video.id;
+      item.dataset.title = (video.title || '').toLowerCase();
+      item.dataset.uploader = (video.uploader || '').toLowerCase();
       item.innerHTML = `
         <div class="video-checkbox">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -243,6 +304,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     updateSelectionCounts();
+  }
+
+  // ---- Filter Video List in Real-Time ----
+  function filterVideoList() {
+    const query = state.searchQuery;
+    const items = els.videoList.querySelectorAll('.video-item');
+    let visibleCount = 0;
+
+    items.forEach(item => {
+      const title = item.dataset.title || '';
+      const uploader = item.dataset.uploader || '';
+      const matches = !query || title.includes(query) || uploader.includes(query);
+
+      if (matches) {
+        item.style.display = 'flex';
+        visibleCount++;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+
+    if (els.clearSearchBtn) {
+      els.clearSearchBtn.classList.toggle('hidden', !query);
+    }
+
+    if (els.searchCountBadge) {
+      if (query) {
+        els.searchCountBadge.textContent = `Showing ${visibleCount} of ${state.videos.length} tracks`;
+      } else {
+        els.searchCountBadge.textContent = `Showing all ${state.videos.length} tracks`;
+      }
+    }
   }
 
   // ---- Toggle Video Selection ----
@@ -288,10 +381,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (format === 'mp3') {
       const options = [
-        { value: '320k', text: 'Best (320kbps)' },
-        { value: '256k', text: 'High (256kbps)' },
-        { value: '192k', text: 'Medium (192kbps)' },
-        { value: '128k', text: 'Low (128kbps)' }
+        { value: '320k', text: '320 kbps (Studio Quality)' },
+        { value: '256k', text: '256 kbps (High Quality)' },
+        { value: '192k', text: '192 kbps (Standard Quality)' },
+        { value: '128k', text: '128 kbps (Compact Size)' }
       ];
       options.forEach(opt => {
         const o = document.createElement('option');
@@ -302,8 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
       state.quality = '320k';
     } else {
       const options = [
-        { value: '1080p', text: '1080p (FHD)' },
-        { value: 'best', text: 'Best Video Quality' },
+        { value: '1080p', text: '1080p (Full HD)' },
+        { value: 'best', text: 'Best Available Resolution' },
         { value: '720p', text: '720p (HD)' },
         { value: '480p', text: '480p (SD)' }
       ];
@@ -329,7 +422,9 @@ document.addEventListener('DOMContentLoaded', () => {
     els.progressBar.style.width = '0%';
     els.progressPercent.textContent = '0%';
     els.progressCount.textContent = `0 / ${selectedVideos.length}`;
-    els.currentDownload.textContent = 'Starting download...';
+    if (els.progressSpeed) els.progressSpeed.textContent = '-- MB/s';
+    if (els.progressEta) els.progressEta.textContent = '--:--';
+    els.currentDownload.textContent = 'Initializing download session...';
     els.progressLog.innerHTML = '';
 
     try {
@@ -354,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ---- Progress Polling ----
+  // ---- Progress Polling (Adaptive 1000ms) ----
   function startPolling() {
     if (state.pollingInterval) clearInterval(state.pollingInterval);
 
@@ -375,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch {
         // Ignore polling errors
       }
-    }, 400);
+    }, 1000);
   }
 
   function updateProgress(data) {
@@ -388,6 +483,13 @@ document.addEventListener('DOMContentLoaded', () => {
     els.progressPercent.textContent = `${overallPercent}%`;
     els.progressCount.textContent = `${done} / ${total}`;
 
+    if (els.progressSpeed) {
+      els.progressSpeed.textContent = data.currentSpeed || '-- MB/s';
+    }
+    if (els.progressEta) {
+      els.progressEta.textContent = data.currentEta ? `~${data.currentEta}` : '--:--';
+    }
+
     if (data.currentVideo) {
       if (filePercent > 0 && filePercent < 100) {
         els.currentDownload.textContent = `Downloading (${filePercent}%): ${data.currentVideo}`;
@@ -395,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
         els.currentDownload.textContent = `Processing: ${data.currentVideo}`;
       }
     } else {
-      els.currentDownload.textContent = 'Processing...';
+      els.currentDownload.textContent = 'Processing media...';
     }
 
     // Update log
@@ -522,10 +624,15 @@ document.addEventListener('DOMContentLoaded', () => {
     state.videos = [];
     state.selectedIds.clear();
     state.sessionId = null;
+    state.searchQuery = '';
     if (state.pollingInterval) clearInterval(state.pollingInterval);
 
     els.playlistUrl.value = '';
     els.videoList.innerHTML = '';
+    if (els.playlistSearchInput) els.playlistSearchInput.value = '';
+    if (els.clearSearchBtn) els.clearSearchBtn.classList.add('hidden');
+    if (els.progressSpeed) els.progressSpeed.textContent = '-- MB/s';
+    if (els.progressEta) els.progressEta.textContent = '--:--';
 
     hideSection(els.loadingSection);
     hideSection(els.errorSection);

@@ -1,65 +1,41 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PlaylistGet — Download YouTube & Spotify Playlists as MP3/MP4</title>
-  <meta name="description" content="PlaylistGet is a free online tool to download YouTube videos, YouTube Music, and Spotify tracks or playlists as MP3 audio or MP4 video. Batch download entire playlists in one click with selectable quality." />
-  <meta name="keywords" content="youtube playlist downloader, download youtube playlist, youtube to mp3, youtube to mp4, spotify playlist downloader, batch download youtube, youtube music downloader, free playlist downloader, download playlist as mp3, download playlist as mp4" />
+  <title>PlaylistGet — Batch YouTube & Spotify Playlist Downloader</title>
+  <meta name="description" content="Free tool to batch download YouTube videos, YouTube Music, and Spotify playlists as high-quality MP3 audio or MP4 video in a clean ZIP file." />
+  <meta name="keywords" content="youtube playlist downloader, spotify playlist downloader, youtube to mp3, youtube to mp4, batch playlist download, high quality mp3 320kbps" />
   <meta name="author" content="PlaylistGet" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="/" />
 
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="PlaylistGet — Download YouTube & Spotify Playlists" />
-  <meta property="og:description" content="Free tool to batch download YouTube videos, YouTube Music, and Spotify tracks or playlists as MP3 or MP4 with selectable quality." />
+  <meta property="og:title" content="PlaylistGet — Batch YouTube & Spotify Playlist Downloader" />
+  <meta property="og:description" content="Download entire playlists from YouTube and Spotify as high-bitrate MP3 or MP4 bundled in a ZIP file." />
   <meta property="og:site_name" content="PlaylistGet" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="PlaylistGet — Download YouTube & Spotify Playlists" />
-  <meta name="twitter:description" content="Free tool to batch download YouTube, YouTube Music, and Spotify playlists as MP3 or MP4." />
+  <meta name="twitter:title" content="PlaylistGet — Batch YouTube & Spotify Playlist Downloader" />
+  <meta name="twitter:description" content="Download entire playlists from YouTube and Spotify as high-bitrate MP3 or MP4 bundled in a ZIP file." />
 
-  <!-- Structured Data (JSON-LD) -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "PlaylistGet",
-    "description": "Free online tool to download YouTube videos, YouTube Music, and Spotify tracks or playlists as MP3 audio or MP4 video. Supports batch downloading entire playlists with selectable quality.",
-    "applicationCategory": "MultimediaApplication",
-    "operatingSystem": "All",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "featureList": [
-      "Download YouTube playlists",
-      "Download single YouTube videos",
-      "Download Spotify tracks and playlists",
-      "Convert to MP3 with selectable bitrate (128k-320k)",
-      "Download as MP4 with selectable resolution (480p-1080p)",
-      "Batch download with progress tracking"
-    ]
-  }
-  </script>
-
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Animated background -->
+  <!-- Ambient background lighting -->
   <div class="bg-grid"></div>
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
   <div class="bg-glow bg-glow-3"></div>
 
   <div class="app">
-    <!-- Header -->
+    <!-- Navbar Header -->
     <header class="header">
       <div class="logo">
         <img src="logo.png" alt="PlaylistGet Logo" class="logo-image" />
@@ -68,44 +44,80 @@
           <p class="logo-sub">Media Downloader</p>
         </div>
       </div>
+      <div class="header-nav">
+        <a href="#howItWorks" class="nav-link">How It Works</a>
+        <a href="#featuresSection" class="nav-link">Features</a>
+        <a href="#faqSection" class="nav-link">FAQ</a>
+      </div>
       <div class="header-status" id="systemStatus">
         <div class="status-dot"></div>
         <span>Checking system...</span>
       </div>
     </header>
 
-    <!-- Main Content -->
+    <!-- Main Content Area -->
     <main class="main">
-      <!-- Input Section -->
-      <section class="input-section" id="inputSection">
-        <div class="section-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-          </svg>
-          STEP 1
-        </div>
-        <h2 class="section-title">Paste URL</h2>
-        <p class="section-desc">Supports YouTube, YouTube Music, and Spotify (Single Media or Playlist)</p>
+      <!-- Hero Section -->
+      <section class="hero-section">
+        <h2 class="hero-title">
+          Download Playlists from <span class="hero-gradient">YouTube & Spotify</span>
+        </h2>
+        <p class="hero-subtitle">
+          Extract entire playlists, albums, or individual tracks into high-bitrate <strong>MP3 Audio (up to 320kbps)</strong> or <strong>MP4 Video (up to 1080p)</strong> — bundled directly into a clean ZIP archive.
+        </p>
 
+        <!-- Platform indicators -->
+        <div class="hero-platforms">
+          <div class="platform-chip">
+            <svg class="chip-icon yt" viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            <span>YouTube & Music</span>
+          </div>
+          <div class="platform-chip">
+            <svg class="chip-icon sp" viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.307c-.217.356-.677.469-1.033.252-2.83-1.728-6.392-2.119-10.589-1.162-.406.092-.813-.163-.905-.568-.093-.406.163-.814.569-.906 4.595-1.049 8.528-.611 11.705 1.35.357.218.47.678.253 1.034zm1.472-3.272c-.274.444-.858.587-1.302.313-3.24-1.992-8.179-2.568-12.012-1.404-.499.151-1.026-.134-1.178-.633-.151-.499.134-1.026.633-1.178 4.382-1.33 9.824-.688 13.546 1.644.444.274.587.859.313 1.302zm.126-3.41c-3.885-2.308-10.297-2.521-14.01-1.393-.596.181-1.229-.157-1.41-.753-.181-.596.157-1.229.753-1.41 4.264-1.295 11.34-1.045 15.82 1.615.536.318.71 1.015.392 1.551-.318.536-1.015.71-1.545.39z"/>
+            </svg>
+            <span>Spotify Playlists & Tracks</span>
+          </div>
+          <div class="platform-chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>Batch ZIP Bundling</span>
+          </div>
+          <div class="platform-chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            <span>MP3 320k & MP4 1080p</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- URL Input Section -->
+      <section class="input-section" id="inputSection">
         <div class="input-group">
           <div class="input-wrapper">
-            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
             </svg>
             <input
               type="url"
               id="playlistUrl"
-              placeholder="https://www.youtube.com/playlist?list=..."
+              placeholder="Paste YouTube or Spotify playlist / track URL here..."
               autocomplete="off"
               spellcheck="false"
             />
             <button class="btn-paste" id="pasteBtn" title="Paste from clipboard">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
+              <span>Paste</span>
             </button>
           </div>
           <button class="btn-primary" id="fetchBtn">
@@ -113,17 +125,25 @@
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <span>Fetch</span>
+            <span>Fetch Playlist</span>
           </button>
         </div>
 
-        <!-- Quick examples -->
+        <!-- Interactive Examples -->
         <div class="examples">
-          <span class="examples-label">Supported:</span>
-          <span class="example-tag">youtube.com/watch?v=...</span>
-          <span class="example-tag">youtube.com/playlist?list=...</span>
-          <span class="example-tag">open.spotify.com/track/...</span>
-          <span class="example-tag">open.spotify.com/playlist/...</span>
+          <span class="examples-label">Try example:</span>
+          <button type="button" class="example-tag" data-url="https://www.youtube.com/watch?v=kJQP7kiw5Fk">
+            <span class="example-badge yt">YouTube</span> Video
+          </button>
+          <button type="button" class="example-tag" data-url="https://www.youtube.com/playlist?list=PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj">
+            <span class="example-badge yt">YouTube</span> Playlist
+          </button>
+          <button type="button" class="example-tag" data-url="https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT">
+            <span class="example-badge sp">Spotify</span> Track
+          </button>
+          <button type="button" class="example-tag" data-url="https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M">
+            <span class="example-badge sp">Spotify</span> Playlist
+          </button>
         </div>
       </section>
 
@@ -134,68 +154,78 @@
           <div class="loader-ring"></div>
           <div class="loader-ring"></div>
         </div>
-        <p class="loading-text">Fetching playlist information...</p>
-        <p class="loading-sub">This may take a moment for large playlists</p>
+        <p class="loading-text">Fetching playlist details...</p>
+        <p class="loading-sub">Please hold on for a moment while tracks are retrieved</p>
       </section>
 
       <!-- Error State -->
       <section class="error-section hidden" id="errorSection">
         <div class="error-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28">
             <circle cx="12" cy="12" r="10" />
             <line x1="15" y1="9" x2="9" y2="15" />
             <line x1="9" y1="9" x2="15" y2="15" />
           </svg>
         </div>
-        <p class="error-text" id="errorText">Something went wrong</p>
+        <p class="error-text" id="errorText">Unable to fetch playlist</p>
         <button class="btn-secondary" id="retryBtn">Try Again</button>
       </section>
 
-      <!-- Playlist Results -->
+      <!-- Playlist Results Section -->
       <section class="results-section hidden" id="resultsSection">
-        <!-- Playlist Header -->
         <div class="playlist-header">
           <div class="playlist-info">
-            <div class="section-badge">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-              STEP 2
-            </div>
-            <h2 class="section-title" id="playlistTitle">Playlist Title</h2>
+            <h3 class="results-title" id="playlistTitle">Playlist Title</h3>
             <p class="playlist-meta">
-              <span id="videoCount">0</span> videos •
-              <span id="selectedCount">0</span> selected
+              <span id="videoCount">0</span> tracks found • <span id="selectedCount">0</span> selected
             </p>
           </div>
           <div class="playlist-actions">
-            <button class="btn-icon" id="selectAllBtn" title="Select All">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <button class="btn-secondary btn-sm" id="selectAllBtn" title="Select All Tracks">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
                 <polyline points="9 11 12 14 22 4" />
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
               </svg>
+              Select All
             </button>
-            <button class="btn-icon" id="deselectAllBtn" title="Deselect All">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <button class="btn-secondary btn-sm" id="deselectAllBtn" title="Deselect All Tracks">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              </svg>
+              Deselect All
+            </button>
+          </div>
+        </div>
+
+        <!-- Search Filter -->
+        <div class="playlist-search-wrapper">
+          <div class="search-input-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input type="text" id="playlistSearchInput" placeholder="Filter tracks by title or artist..." autocomplete="off" />
+            <button type="button" class="btn-clear-search hidden" id="clearSearchBtn" title="Clear filter">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
+          <span class="search-count-badge" id="searchCountBadge">Showing all tracks</span>
         </div>
 
         <!-- Video List -->
         <div class="video-list" id="videoList"></div>
 
-        <!-- Download Options -->
+        <!-- Download Configuration Panel -->
         <div class="download-panel" id="downloadPanel">
           <div class="download-options">
             <div class="format-group">
               <label class="format-label">Format</label>
               <div class="format-selector">
                 <button class="format-btn active" data-format="mp3" id="formatMp3">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
                     <circle cx="18" cy="16" r="3" />
@@ -203,7 +233,7 @@
                   MP3 Audio
                 </button>
                 <button class="format-btn" data-format="mp4" id="formatMp4">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
                     <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
                     <line x1="7" y1="2" x2="7" y2="22" />
                     <line x1="17" y1="2" x2="17" y2="22" />
@@ -225,7 +255,7 @@
             </div>
           </div>
           <button class="btn-download" id="downloadBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
@@ -235,17 +265,9 @@
         </div>
       </section>
 
-      <!-- Download Progress -->
+      <!-- Download Progress Section -->
       <section class="progress-section hidden" id="progressSection">
-        <div class="section-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          PROCESSING
-        </div>
-        <h2 class="section-title">Processing Playlist</h2>
+        <h3 class="results-title">Processing Download</h3>
 
         <div class="progress-container">
           <div class="progress-bar-bg">
@@ -255,30 +277,43 @@
             <span id="progressPercent">0%</span>
             <span id="progressCount">0 / 0</span>
           </div>
-          <p class="progress-current" id="currentDownload">Preparing...</p>
+
+          <!-- Speed & ETA Metrics -->
+          <div class="progress-metrics">
+            <div class="metric-item">
+              <span class="metric-label">Speed:</span>
+              <span class="metric-val" id="progressSpeed">-- MB/s</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">ETA:</span>
+              <span class="metric-val" id="progressEta">--:--</span>
+            </div>
+          </div>
+
+          <p class="progress-current" id="currentDownload">Preparing download session...</p>
           <div class="progress-notice">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            Don't worry if it looks stuck, processing continues in the background.
+            Please keep this tab open while server processes and encodes the media.
           </div>
         </div>
 
         <div class="progress-log" id="progressLog"></div>
       </section>
 
-      <!-- Download Complete -->
+      <!-- Complete Section -->
       <section class="complete-section hidden" id="completeSection">
         <div class="complete-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="44" height="44">
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
             <polyline points="22 4 12 14.01 9 11.01" />
           </svg>
         </div>
-        <h2 class="section-title">Processing Complete!</h2>
-        <p class="complete-stats" id="completeStats">0 files processed successfully</p>
+        <h3 class="results-title">Ready for Download</h3>
+        <p class="complete-stats" id="completeStats">All tracks processed successfully</p>
 
         <div class="complete-errors hidden" id="completeErrors">
           <p class="error-summary" id="errorSummary"></p>
@@ -286,27 +321,269 @@
 
         <div class="complete-actions">
           <button class="btn-download" id="downloadZipBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span>Download ZIP</span>
+            <span>Download ZIP Archive</span>
           </button>
           <button class="btn-secondary" id="newDownloadBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <polyline points="1 4 1 10 7 10" />
               <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
             </svg>
-            Start New Download
+            Download Another Playlist
           </button>
+        </div>
+      </section>
+
+      <!-- How It Works Section -->
+      <section class="guide-section" id="howItWorks">
+        <div class="section-header-center">
+          <h2 class="section-title-center">How It Works</h2>
+          <p class="section-subtitle-center">Three streamlined steps from link to offline archive</p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-number">01</div>
+            <div class="step-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </div>
+            <h3 class="step-title">Paste URL</h3>
+            <p class="step-desc">Copy and paste any playlist or track link from <strong>YouTube</strong>, <strong>YouTube Music</strong>, or <strong>Spotify</strong> into the search bar.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-number">02</div>
+            <div class="step-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <h3 class="step-title">Select & Configure</h3>
+            <p class="step-desc">Choose specific tracks to include. Select <strong>MP3 Audio</strong> (up to 320kbps) or <strong>MP4 Video</strong> (up to 1080p resolution).</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-number">03</div>
+            <div class="step-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </div>
+            <h3 class="step-title">Download ZIP</h3>
+            <p class="step-desc">Click download. The server processes all files in parallel and packages them into a clean, structured ZIP archive.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features Section -->
+      <section class="features-section" id="featuresSection">
+        <div class="section-header-center">
+          <h2 class="section-title-center">Built for Speed and Quality</h2>
+          <p class="section-subtitle-center">Everything you need for seamless offline media archiving</p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Batch Multi-Threaded</h3>
+            <p class="feature-desc">Download dozens of songs concurrently with worker queues instead of slow one-by-one downloads.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <circle cx="12" cy="12" r="10" />
+                <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Spotify Integration</h3>
+            <p class="feature-desc">Auto-resolves Spotify tracks, albums, and playlists into matching high-quality audio streams.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <h3 class="feature-title">High-Fidelity Audio</h3>
+            <p class="feature-desc">FFmpeg-powered encoding with bitrates up to 320 kbps for deep bass and clear vocal reproduction.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Clean Track Naming</h3>
+            <p class="feature-desc">Automated metadata sanitization strips video tags and formats filenames as clean <em>Title - Artist</em>.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Private & Ad-Free</h3>
+            <p class="feature-desc">No deceptive redirects, zero intrusive popups, and temporary session files are purged automatically.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon-wrapper">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Responsive Design</h3>
+            <p class="feature-desc">Optimized interface built for smooth performance across desktop browsers, tablets, and mobile devices.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ Section -->
+      <section class="faq-section" id="faqSection">
+        <div class="section-header-center">
+          <h2 class="section-title-center">Frequently Asked Questions</h2>
+          <p class="section-subtitle-center">Everything you need to know about using PlaylistGet</p>
+        </div>
+
+        <div class="faq-list">
+          <div class="faq-item">
+            <button class="faq-question" type="button" aria-expanded="false">
+              <span>How do I copy a playlist URL from YouTube or Spotify?</span>
+              <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>It is quick and straightforward:</p>
+              <ul>
+                <li><strong>YouTube:</strong> Open your playlist page, click <em>Share</em>, and click <em>Copy Link</em> (or copy the URL directly from your browser's address bar).</li>
+                <li><strong>Spotify:</strong> Click the three dots (•••) on any playlist or song → select <em>Share</em> → click <em>Copy link to playlist</em>.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" type="button" aria-expanded="false">
+              <span>Can I choose which specific songs to download?</span>
+              <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p><strong>Yes.</strong> Once the playlist is fetched, every song appears in a selectable list. You can toggle checkboxes individually, filter tracks via the search bar, or use the <em>Select All / Deselect All</em> controls.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" type="button" aria-expanded="false">
+              <span>What is the difference between MP3 bitrate qualities?</span>
+              <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>Bitrate affects audio fidelity and file size:</p>
+              <ul>
+                <li><strong>320 kbps (Recommended):</strong> Highest studio-grade clarity with full dynamic range and punchy bass.</li>
+                <li><strong>256 kbps & 192 kbps:</strong> High-standard balanced quality with smaller file sizes.</li>
+                <li><strong>128 kbps:</strong> Compact file size, suitable if device storage is limited.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" type="button" aria-expanded="false">
+              <span>How are downloaded files delivered?</span>
+              <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>When downloading multiple items, the server bundles them into a single <code>.ZIP</code> archive with zero compression overhead for instantaneous download. Single tracks are saved directly in their native format (e.g. <code>song.mp3</code> or <code>video.mp4</code>).</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" type="button" aria-expanded="false">
+              <span>Is there a limit on playlist size?</span>
+              <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>To ensure high performance and stability for all users, batches are capped at <strong>200 tracks per session</strong>. Larger playlists can easily be split into multiple downloads.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" type="button" aria-expanded="false">
+              <span>Is this tool free and safe to use?</span>
+              <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p><strong>100% Free and Safe.</strong> PlaylistGet does not serve malware, popups, or ads. All audio and video streams are encoded using official open-source FFmpeg and yt-dlp engines.</p>
+            </div>
+          </div>
         </div>
       </section>
     </main>
 
-    <!-- Footer -->
+    <!-- Clean Footer -->
     <footer class="footer">
-      <!-- <p>Built with ❤️ using <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a> • For personal use only</p> -->
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="logo">
+            <img src="logo.png" alt="PlaylistGet Logo" class="logo-image" style="width: 28px; height: 28px;" />
+            <span class="logo-text" style="font-size: 1.05rem;">Playlist<span class="accent">Get</span></span>
+          </div>
+          <p class="footer-desc">A fast, modern web utility to batch download YouTube and Spotify playlists as MP3 and MP4 archives.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h4 class="footer-heading">Navigation</h4>
+            <a href="#inputSection">Downloader</a>
+            <a href="#howItWorks">How It Works</a>
+            <a href="#featuresSection">Features</a>
+            <a href="#faqSection">FAQ</a>
+          </div>
+          <div class="footer-col">
+            <h4 class="footer-heading">Supported Formats</h4>
+            <span>MP3 Audio (320kbps)</span>
+            <span>MP4 Video (1080p FHD)</span>
+            <span>YouTube to ZIP</span>
+            <span>Spotify to MP3</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2026 PlaylistGet. For personal and educational use only.</p>
+      </div>
     </footer>
   </div>
 

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
@@ -6,32 +7,48 @@ const archiver = require('archiver');
 const { v4: uuidv4 } = require('uuid');
 const ffmpegStatic = require('ffmpeg-static');
 const spotifyUrlInfo = require('spotify-url-info')(fetch);
+const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+// Trust reverse proxy (Cloudflare, Nginx, Railway, Render, etc.)
+app.set('trust proxy', 1);
 
 // ── Security & Resource Limits ─────────────────────────────────────
 const LIMITS = {
-  MAX_PLAYLIST_SIZE: 200,        // Max videos per download session
-  MAX_CONCURRENT_SESSIONS: 3,   // Max active download sessions at once
-  SESSION_TTL_MS: 30 * 60 * 1000, // 30 min: auto-expire completed sessions
-  ORPHAN_TTL_MS: 60 * 60 * 1000,  // 60 min: clean up orphaned folders
-  CLEANUP_INTERVAL_MS: 5 * 60 * 1000, // Run cleanup every 5 minutes
-  RATE_LIMIT_WINDOW_MS: 60 * 1000, // 1 minute window
-  RATE_LIMIT_MAX_REQUESTS: 15,   // Max 15 requests per minute per IP
-  MAX_BODY_SIZE: '100kb',        // Limit JSON body size
+  MAX_PLAYLIST_SIZE: parseInt(process.env.MAX_PLAYLIST_SIZE, 10) || 200,
+  MAX_CONCURRENT_SESSIONS: parseInt(process.env.MAX_CONCURRENT_SESSIONS, 10) || 5,
+  CONCURRENT_DOWNLOADS_PER_SESSION: parseInt(process.env.CONCURRENT_DOWNLOADS_PER_SESSION, 10) || 2,
+  SESSION_TTL_MS: (parseInt(process.env.SESSION_TTL_MINUTES, 10) || 30) * 60 * 1000,
+  ORPHAN_TTL_MS: (parseInt(process.env.ORPHAN_TTL_MINUTES, 10) || 60) * 60 * 1000,
+  CLEANUP_INTERVAL_MS: 5 * 60 * 1000,
+  RATE_LIMIT_WINDOW_MS: 60 * 1000,
+  RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 20,
+  MAX_BODY_SIZE: '100kb',
   ALLOWED_FORMATS: ['mp3', 'mp4'],
   ALLOWED_QUALITIES: ['128k', '192k', '256k', '320k', '480p', '720p', '1080p', 'best'],
+  COOKIES_PATH: process.env.YTDLP_COOKIES_PATH || null,
 };
+
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validateSessionId(req, res, next) {
+  const { sessionId } = req.params;
+  if (!sessionId || !UUID_REGEX.test(sessionId)) {
+    return res.status(400).json({ error: 'Invalid or malformed session ID' });
+  }
+  next();
+}
 
 // ── Simple rate limiter (per-IP, in-memory) ────────────────────────
 const rateLimitStore = new Map();
 function rateLimit(req, res, next) {
-  // Only rate limit POST requests (fetching playlist and starting downloads)
   if (req.method !== 'POST') {
     return next();
   }
-  const ip = req.ip || req.connection.remoteAddress;
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
   const now = Date.now();
   if (!rateLimitStore.has(ip)) {
     rateLimitStore.set(ip, []);
@@ -54,6 +71,22 @@ setInterval(() => {
     else rateLimitStore.set(ip, fresh);
   }
 }, 2 * 60 * 1000);
+
+// ── Security Headers & CORS ─────────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*';
+app.use(cors({
+  origin: allowedOrigins === '*' ? '*' : allowedOrigins,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Middleware
 app.use(express.json({ limit: LIMITS.MAX_BODY_SIZE }));
@@ -89,6 +122,18 @@ function checkFfmpeg() {
     return false;
   }
 }
+
+// API: Health Check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    activeSessions: [...sessions.values()].filter(s => s.status === 'downloading').length,
+    ytDlpAvailable: checkYtDlp(),
+    ffmpegAvailable: checkFfmpeg()
+  });
+});
 
 // API: Check system requirements
 app.get('/api/check', (req, res) => {
@@ -127,7 +172,7 @@ app.post('/api/playlist', async (req, res) => {
     return res.status(400).json({ error: 'Invalid URL. Please provide a valid YouTube or Spotify URL.' });
   }
 
-  // Reject URLs that are suspiciously long (possible injection attempt)
+  // Reject URLs that are suspiciously long
   if (url.length > 500) {
     return res.status(400).json({ error: 'URL is too long.' });
   }
@@ -140,6 +185,10 @@ app.post('/api/playlist', async (req, res) => {
       '--ignore-errors'
     ];
 
+    if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
+      args.push('--cookies', LIMITS.COOKIES_PATH);
+    }
+
     let customTitle = null;
     let spotifyData = null;
 
@@ -148,18 +197,18 @@ app.post('/api/playlist', async (req, res) => {
       spotifyData = await spotifyUrlInfo.getData(url);
       
       if (spotifyData.type === 'track') {
-        customTitle = `${spotifyData.name} - ${spotifyData.artists[0].name}`;
-        args.push(`ytsearch1:${spotifyData.name} ${spotifyData.artists[0].name}`);
+        customTitle = `${spotifyData.name} - ${spotifyData.artists[0]?.name || 'Unknown'}`;
+        args.push('--', `ytsearch1:${spotifyData.name} ${spotifyData.artists[0]?.name || ''}`);
       } else if (spotifyData.trackList && spotifyData.trackList.length > 0) {
         customTitle = spotifyData.name;
         spotifyData.trackList.forEach(track => {
-          args.push(`ytsearch1:${track.title} ${track.subtitle}`);
+          args.push('--', `ytsearch1:${track.title} ${track.subtitle || ''}`);
         });
       } else {
         return res.status(400).json({ error: 'Could not fetch tracks from Spotify URL.' });
       }
     } else {
-      args.push(url);
+      args.push('--', url);
     }
 
     const ytdlp = spawn('yt-dlp', args);
@@ -176,8 +225,13 @@ app.post('/api/playlist', async (req, res) => {
 
     ytdlp.on('close', (code) => {
       if (!output.trim()) {
+        const isBotCheck = errorOutput.includes('Sign in to confirm') || errorOutput.includes('bot');
+        const userFriendlyError = isBotCheck
+          ? 'YouTube meminta verifikasi bot pada server saat ini. Silakan coba link lain atau hubungi admin.'
+          : 'Could not fetch playlist. Make sure the URL is valid, public, and not restricted.';
+
         return res.status(400).json({
-          error: 'Could not fetch playlist. Make sure the URL is valid and public.',
+          error: userFriendlyError,
           details: errorOutput
         });
       }
@@ -218,7 +272,7 @@ app.post('/api/playlist', async (req, res) => {
             rawUploader = parts[0].trim();
           }
 
-          // Clean uploader name (e.g. "Daniel Caesar - Topic" -> "Daniel Caesar")
+          // Clean uploader name
           const cleanArtist = rawUploader
             ? rawUploader.replace(/\s*-\s*Topic$/i, '').replace(/\s*VEVO$/i, '').trim()
             : null;
@@ -250,12 +304,12 @@ app.post('/api/playlist', async (req, res) => {
           videos
         });
       } catch (parseError) {
-        res.status(500).json({ error: 'Failed to parse data.', details: parseError.message });
+        res.status(500).json({ error: 'Failed to parse playlist data.', details: parseError.message });
       }
     });
 
     ytdlp.on('error', (err) => {
-      res.status(500).json({ error: 'Failed to run yt-dlp.', details: err.message });
+      res.status(500).json({ error: 'Failed to execute yt-dlp.', details: err.message });
     });
   } catch (err) {
     res.status(500).json({ error: 'Server error: ' + err.message });
@@ -263,12 +317,14 @@ app.post('/api/playlist', async (req, res) => {
 });
 
 // API: Cancel / Cleanup
-app.post('/api/cancel/:sessionId', (req, res) => {
+app.post('/api/cancel/:sessionId', validateSessionId, (req, res) => {
   const session = sessions.get(req.params.sessionId);
   if (session) {
     session.status = 'cancelled';
-    if (session.process) {
-      try { session.process.kill(); } catch (e) {}
+    if (session.activeProcesses && session.activeProcesses.length > 0) {
+      session.activeProcesses.forEach(proc => {
+        try { proc.kill('SIGTERM'); } catch {}
+      });
     }
     cleanupSession(session.id);
     sessions.delete(session.id);
@@ -286,7 +342,7 @@ app.post('/api/download', (req, res) => {
 
   // Cap playlist size
   if (videos.length > LIMITS.MAX_PLAYLIST_SIZE) {
-    return res.status(400).json({ error: `Maximum ${LIMITS.MAX_PLAYLIST_SIZE} videos per download. You selected ${videos.length}.` });
+    return res.status(400).json({ error: `Maximum ${LIMITS.MAX_PLAYLIST_SIZE} videos per download batch. You selected ${videos.length}.` });
   }
 
   // Validate format & quality
@@ -296,7 +352,7 @@ app.post('/api/download', (req, res) => {
   // Limit concurrent sessions
   const activeSessions = [...sessions.values()].filter(s => s.status === 'downloading').length;
   if (activeSessions >= LIMITS.MAX_CONCURRENT_SESSIONS) {
-    return res.status(429).json({ error: 'Server is busy. Please wait for current downloads to finish and try again.' });
+    return res.status(429).json({ error: 'Server is currently busy. Please wait for ongoing downloads to complete.' });
   }
 
   const sessionId = uuidv4();
@@ -312,6 +368,8 @@ app.post('/api/download', (req, res) => {
     failed: 0,
     currentVideo: '',
     currentProgress: 0,
+    currentSpeed: '',
+    currentEta: '',
     status: 'downloading',
     progress: 0,
     files: [],
@@ -319,23 +377,24 @@ app.post('/api/download', (req, res) => {
     downloadedTitles: [],
     format,
     ffmpegAvailable,
+    activeProcesses: [],
     createdAt: Date.now(),
     completedAt: null
   };
 
   sessions.set(sessionId, session);
 
-  // Start downloading in background
-  downloadVideos(session, videos, sessionDir, format, quality);
+  // Start concurrent worker download in background
+  downloadVideosConcurrently(session, videos, sessionDir, format, quality);
 
   res.json({ sessionId, message: 'Download started' });
 });
 
 // API: Check download progress
-app.get('/api/progress/:sessionId', (req, res) => {
+app.get('/api/progress/:sessionId', validateSessionId, (req, res) => {
   const session = sessions.get(req.params.sessionId);
   if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
+    return res.status(404).json({ error: 'Session not found or expired' });
   }
   const total = session.totalVideos || 0;
   const done = (session.completed || 0) + (session.failed || 0);
@@ -352,23 +411,35 @@ app.get('/api/progress/:sessionId', (req, res) => {
   }
 
   res.json({
-    ...session,
+    id: session.id,
+    totalVideos: session.totalVideos,
+    completed: session.completed,
+    failed: session.failed,
+    currentVideo: session.currentVideo,
     currentProgress,
-    progress: overallProgress
+    currentSpeed: session.currentSpeed || '',
+    currentEta: session.currentEta || '',
+    status: session.status,
+    progress: overallProgress,
+    files: session.files,
+    errors: session.errors,
+    downloadedTitles: session.downloadedTitles
   });
 });
 
-// API: Download ZIP file
-app.get('/api/download-zip/:sessionId', (req, res) => {
+// API: Download ZIP file (level 0 = store only, instant bundling, zero CPU overhead!)
+app.get('/api/download-zip/:sessionId', validateSessionId, (req, res) => {
   const session = sessions.get(req.params.sessionId);
   if (!session || session.status !== 'completed') {
-    return res.status(400).json({ error: 'Download not ready yet.' });
+    return res.status(400).json({ error: 'Download is not ready yet.' });
   }
 
   const sessionDir = path.join(DOWNLOADS_DIR, session.id);
+  if (!fs.existsSync(sessionDir)) {
+    return res.status(404).json({ error: 'Session directory not found.' });
+  }
 
-  // Create ZIP archive
-  const archive = archiver('zip', { zlib: { level: 5 } });
+  const archive = archiver('zip', { zlib: { level: 0 } });
   const zipName = `playlist_${session.id.substring(0, 8)}.zip`;
 
   res.setHeader('Content-Type', 'application/zip');
@@ -376,7 +447,6 @@ app.get('/api/download-zip/:sessionId', (req, res) => {
 
   archive.pipe(res);
 
-  // Add all downloaded files to the ZIP
   session.files.forEach(file => {
     const filePath = path.join(sessionDir, file);
     if (fs.existsSync(filePath)) {
@@ -386,26 +456,26 @@ app.get('/api/download-zip/:sessionId', (req, res) => {
 
   archive.finalize();
 
-  // Clean up after a delay
   archive.on('end', () => {
     setTimeout(() => {
       cleanupSession(session.id);
-    }, 120000); // Clean up 2 minutes after stream ends to ensure download completes
+    }, 120000); // Clean up 2 minutes after download completes
   });
 });
 
 // API: Download single file
-app.get('/api/download-file/:sessionId/:filename', (req, res) => {
+app.get('/api/download-file/:sessionId/:filename', validateSessionId, (req, res) => {
   const session = sessions.get(req.params.sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
 
   const sessionDir = path.join(DOWNLOADS_DIR, session.id);
-  const filePath = path.join(sessionDir, req.params.filename);
+  const safeFilename = path.basename(req.params.filename);
+  const filePath = path.join(sessionDir, safeFilename);
 
   // Security: prevent directory traversal
-  if (!filePath.startsWith(sessionDir)) {
+  if (!path.resolve(filePath).startsWith(path.resolve(sessionDir))) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
@@ -413,69 +483,25 @@ app.get('/api/download-file/:sessionId/:filename', (req, res) => {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  res.download(filePath, req.params.filename, (err) => {
-    // Clean up after download finishes
+  res.download(filePath, safeFilename, () => {
     setTimeout(() => {
       cleanupSession(session.id);
-    }, 120000); // 2 minutes to ensure browser finishes saving
+    }, 120000);
   });
 });
-
-function formatTrackFilename(video) {
-  let title = (video.title || 'Track').trim();
-  let rawUploader = (video.uploader || video.artist || '').trim();
-
-  // Clean uploader: strip "- Topic", "VEVO", etc.
-  let cleanArtist = rawUploader
-    .replace(/\s*-\s*Topic$/i, '')
-    .replace(/\s*VEVO$/i, '')
-    .trim();
-
-  let formatted = title;
-
-  if (cleanArtist && cleanArtist !== 'Unknown' && cleanArtist.toLowerCase() !== 'various artists') {
-    const titleLower = title.toLowerCase();
-    const artistLower = cleanArtist.toLowerCase();
-
-    const containsArtist = titleLower.includes(artistLower);
-
-    if (!containsArtist) {
-      formatted = `${title} - ${cleanArtist}`;
-    }
-  }
-
-  // Remove invalid OS characters: \ / : * ? " < > |
-  let sanitized = formatted
-    .replace(/[\\/:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!sanitized || sanitized === '.' || sanitized === '..') {
-    sanitized = 'Track';
-  }
-
-  if (sanitized.length > 150) {
-    sanitized = sanitized.substring(0, 150).trim();
-  }
-
-  return sanitized;
-}
 
 function cleanDownloadedFilename(filename) {
   const ext = path.extname(filename);
   let name = path.basename(filename, ext);
 
-  // Strip "- Topic" and "VEVO"
   name = name
     .replace(/\s*-\s*Topic\b/gi, '')
     .replace(/\s*VEVO\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Remove trailing generic NA / Unknown artist additions from yt-dlp template fallback
   name = name.replace(/\s*-\s*(NA|Unknown)\b/gi, '').trim();
 
-  // If filename pattern is "Title - Artist - RecordLabel"
   const parts = name.split(' - ').map(p => p.trim()).filter(Boolean);
   if (parts.length >= 3) {
     const lastPart = parts[parts.length - 1].toLowerCase();
@@ -485,7 +511,6 @@ function cleanDownloadedFilename(filename) {
     }
   }
 
-  // Remove invalid OS characters: \ / : * ? " < > |
   let sanitized = name
     .replace(/[\\/:*?"<>|]/g, '')
     .replace(/\s+/g, ' ')
@@ -497,48 +522,56 @@ function cleanDownloadedFilename(filename) {
   return `${sanitized}${ext}`;
 }
 
-// Download videos sequentially
-async function downloadVideos(session, videos, sessionDir, format, quality) {
-  for (let i = 0; i < videos.length; i++) {
-    if (session.status === 'cancelled') break;
+// Download videos with concurrency pool for maximum speed
+async function downloadVideosConcurrently(session, videos, sessionDir, format, quality) {
+  const concurrency = LIMITS.CONCURRENT_DOWNLOADS_PER_SESSION;
+  let currentIndex = 0;
 
-    const video = videos[i];
-    session.currentVideo = video.title || `Video ${i + 1}`;
-    console.log(`[${i + 1}/${videos.length}] Downloading: ${session.currentVideo}`);
+  async function worker() {
+    while (currentIndex < videos.length && session.status !== 'cancelled') {
+      const index = currentIndex++;
+      const video = videos[index];
 
-    try {
-      await downloadSingleVideo(session, video, sessionDir, format, quality, session.ffmpegAvailable);
-      
-      if (session.status === 'cancelled') break;
-      
-      session.completed++;
-      
-      // Update session files and downloaded titles
-      if (fs.existsSync(sessionDir)) {
-        const files = fs.readdirSync(sessionDir);
-        session.files = files;
-        if (files.length > 0) {
-          const latestFile = files[files.length - 1];
-          const cleanTitle = path.basename(latestFile, path.extname(latestFile));
-          session.downloadedTitles.push(cleanTitle);
+      session.currentVideo = video.title || `Video ${index + 1}`;
+      console.log(`[${index + 1}/${videos.length}] Starting download: ${session.currentVideo}`);
+
+      try {
+        await downloadSingleVideo(session, video, sessionDir, format, quality, session.ffmpegAvailable);
+        
+        if (session.status === 'cancelled') break;
+
+        session.completed++;
+
+        if (fs.existsSync(sessionDir)) {
+          const files = fs.readdirSync(sessionDir);
+          session.files = files;
+          if (files.length > 0) {
+            const latestFile = files[files.length - 1];
+            const cleanTitle = path.basename(latestFile, path.extname(latestFile));
+            if (!session.downloadedTitles.includes(cleanTitle)) {
+              session.downloadedTitles.push(cleanTitle);
+            }
+          }
         }
+        console.log(`  ✓ Success [${index + 1}/${videos.length}]`);
+      } catch (err) {
+        if (session.status === 'cancelled') break;
+        session.failed++;
+        session.errors.push({ video: video.title, error: err.message });
+        console.error(`  ✗ Failed [${index + 1}/${videos.length}]: ${err.message.substring(0, 200)}`);
       }
-      console.log(`  ✓ Success`);
-    } catch (err) {
-      if (session.status === 'cancelled') {
-        console.log(`  ⚠ Cancelled by user`);
-        break;
-      }
-      session.failed++;
-      session.errors.push({ video: video.title, error: err.message });
-      console.error(`  ✗ Failed: ${err.message.substring(0, 200)}`);
     }
   }
+
+  const workers = Array.from({ length: Math.min(concurrency, videos.length) }, () => worker());
+  await Promise.all(workers);
 
   if (session.status !== 'cancelled') {
     session.status = 'completed';
     session.completedAt = Date.now();
     session.currentVideo = '';
+    session.currentSpeed = '';
+    session.currentEta = '';
     console.log(`\nDownload session complete: ${session.completed} success, ${session.failed} failed`);
   } else {
     console.log(`\nDownload session cancelled.`);
@@ -549,7 +582,6 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
   return new Promise((resolve, reject) => {
     session.currentProgress = 0;
 
-    // Build the actual YouTube URL
     let videoUrl;
     if (video.url && video.url.startsWith('http')) {
       videoUrl = video.url;
@@ -561,13 +593,11 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       return reject(new Error('No valid video URL or ID'));
     }
 
-    // Count files before download to detect new files
     let filesBefore = new Set();
     if (fs.existsSync(outputDir)) {
       filesBefore = new Set(fs.readdirSync(outputDir));
     }
 
-    // Use yt-dlp metadata fields for title and artist/uploader/channel
     const outputTemplate = path.join(outputDir, '%(title).100B - %(artist,uploader,channel)s.%(ext)s');
 
     let args = [
@@ -576,6 +606,10 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       '--no-check-certificates',
       '--no-warnings'
     ];
+
+    if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
+      args.push('--cookies', LIMITS.COOKIES_PATH);
+    }
 
     if (ffmpegAvailable) {
       if (ffmpegStatic) {
@@ -610,12 +644,12 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       }
     }
 
-    args.push(videoUrl);
-
-    console.log(`  Command: yt-dlp ${args.join(' ')}`);
+    // Safety separator before positional argument
+    args.push('--', videoUrl);
 
     const ytdlp = spawn('yt-dlp', args);
-    session.process = ytdlp;
+    if (!session.activeProcesses) session.activeProcesses = [];
+    session.activeProcesses.push(ytdlp);
 
     let stdout = '';
     let stderr = '';
@@ -623,7 +657,7 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     ytdlp.stdout.on('data', (data) => {
       const chunk = data.toString();
       stdout += chunk;
-      // Log download progress and update session.currentProgress
+
       if (chunk.includes('[download]') && chunk.includes('%')) {
         const matches = [...chunk.matchAll(/(\d+\.?\d*)%/g)];
         if (matches.length > 0) {
@@ -631,8 +665,19 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
           const pct = parseFloat(lastMatch[1]);
           if (!isNaN(pct)) {
             session.currentProgress = pct;
-            process.stdout.write(`\r  Progress: ${pct.toFixed(1)}%`);
           }
+        }
+
+        // Extract speed (e.g. at 5.24MiB/s)
+        const speedMatch = chunk.match(/at\s+([\d\.]+\w+\/s)/);
+        if (speedMatch) {
+          session.currentSpeed = speedMatch[1];
+        }
+
+        // Extract ETA (e.g. ETA 00:05)
+        const etaMatch = chunk.match(/ETA\s+([\d\:]+)/);
+        if (etaMatch) {
+          session.currentEta = etaMatch[1];
         }
       }
     });
@@ -642,24 +687,19 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     });
 
     ytdlp.on('close', (code) => {
-      process.stdout.write('\n'); // Newline after progress
+      session.activeProcesses = session.activeProcesses.filter(p => p !== ytdlp);
 
-      // Safety check: Ensure output directory still exists
       if (!fs.existsSync(outputDir)) {
-        console.log(`  ⚠ Output directory no longer exists (cancelled or cleaned up).`);
         resolve();
         return;
       }
 
-      // PRIMARY CHECK: Did any new files appear in the output directory?
       const filesAfter = new Set(fs.readdirSync(outputDir));
       const newFiles = [...filesAfter].filter(f => !filesBefore.has(f) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
 
       if (newFiles.length > 0) {
-        console.log(`  📁 New file(s): ${newFiles.join(', ')}`);
         session.currentProgress = 100;
 
-        // Post-processing rename to clean up filename and ensure "Judul - Penyanyi" format
         for (const downloadedFile of newFiles) {
           const cleanedName = cleanDownloadedFilename(downloadedFile);
           const currentPath = path.join(outputDir, downloadedFile);
@@ -671,7 +711,6 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
                 fs.unlinkSync(targetPath);
               }
               fs.renameSync(currentPath, targetPath);
-              console.log(`  🏷 Cleaned & Renamed: "${downloadedFile}" -> "${cleanedName}"`);
             } catch (renameErr) {
               console.error(`  ⚠️ Could not rename file: ${renameErr.message}`);
             }
@@ -682,31 +721,30 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
         return;
       }
 
-      // No new files — check if it was a real error
       const allOutput = stdout + '\n' + stderr;
 
-      // Check for "already downloaded" case
       if (allOutput.includes('has already been downloaded')) {
-        console.log(`  ℹ Already downloaded`);
         resolve();
         return;
       }
 
-      // Actual failure
       const errorLines = allOutput.split('\n').filter(line =>
         line.includes('ERROR') || line.includes('unable to download') ||
         line.includes('unavailable') || line.includes('Private video') ||
         line.includes('Sign in to confirm')
       );
-      const errorMsg = errorLines.length > 0
-        ? errorLines[0].trim().replace(/^ERROR:\s*/, '')
-        : `Download failed (exit code ${code}). ${stderr.substring(0, 200)}`;
+      const isBotCheck = allOutput.includes('Sign in to confirm') || allOutput.includes('bot');
+      const errorMsg = isBotCheck
+        ? 'Dibatasi oleh YouTube (Sign in/Bot Check). Coba beberapa saat lagi.'
+        : errorLines.length > 0
+          ? errorLines[0].trim().replace(/^ERROR:\s*/, '')
+          : `Download failed (exit code ${code}).`;
 
-      console.log(`  ❌ Error output: ${allOutput.substring(0, 300)}`);
       reject(new Error(errorMsg));
     });
 
     ytdlp.on('error', (err) => {
+      session.activeProcesses = session.activeProcesses.filter(p => p !== ytdlp);
       reject(new Error(`Failed to spawn yt-dlp: ${err.message}`));
     });
   });
@@ -733,26 +771,25 @@ function cleanupSession(sessionId) {
   } catch {}
 }
 
-// ── Periodic cleanup: expired sessions + orphaned folders ─────────
+// Periodic cleanup
 setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessions.entries()) {
     const age = now - (session.completedAt || session.createdAt || 0);
-    // Clean completed sessions older than TTL
     if (session.status === 'completed' && age > LIMITS.SESSION_TTL_MS) {
       console.log(`  🧹 Auto-cleaning expired session: ${id.substring(0, 8)}`);
       cleanupSession(id);
     }
-    // Clean stuck/downloading sessions older than ORPHAN_TTL
     if (session.status === 'downloading' && age > LIMITS.ORPHAN_TTL_MS) {
       console.log(`  🧹 Auto-cleaning stale session: ${id.substring(0, 8)}`);
       session.status = 'cancelled';
-      if (session.process) { try { session.process.kill(); } catch {} }
+      if (session.activeProcesses) {
+        session.activeProcesses.forEach(p => { try { p.kill('SIGTERM'); } catch {} });
+      }
       cleanupSession(id);
     }
   }
 
-  // Clean orphaned folders with no matching session
   try {
     const folders = fs.readdirSync(DOWNLOADS_DIR);
     for (const folder of folders) {
@@ -768,7 +805,7 @@ setInterval(() => {
   } catch {}
 }, LIMITS.CLEANUP_INTERVAL_MS);
 
-// ── Clean up leftover downloads from previous server runs ─────────
+// Clean up leftover downloads on startup
 try {
   const leftoverFolders = fs.readdirSync(DOWNLOADS_DIR);
   if (leftoverFolders.length > 0) {
@@ -779,6 +816,20 @@ try {
   }
 } catch {}
 
+// Graceful Shutdown
+function handleShutdown(signal) {
+  console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+  for (const session of sessions.values()) {
+    if (session.activeProcesses) {
+      session.activeProcesses.forEach(p => { try { p.kill('SIGTERM'); } catch {} });
+    }
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+
 app.listen(PORT, () => {
   const ffmpegOk = checkFfmpeg();
   console.log(`\n  🎵 PlaylistGet — Media Downloader`);
@@ -786,11 +837,6 @@ app.listen(PORT, () => {
   console.log(`  Server running at: http://localhost:${PORT}`);
   console.log(`  yt-dlp status:  ${checkYtDlp() ? '✅ Available' : '❌ Not found'}`);
   console.log(`  ffmpeg status:  ${ffmpegOk ? '✅ Available' : '⚠️  Not found (MP3 conversion disabled)'}`);
-  console.log(`  Limits:  max ${LIMITS.MAX_PLAYLIST_SIZE} videos | ${LIMITS.MAX_CONCURRENT_SESSIONS} concurrent sessions`);
-  if (!ffmpegOk) {
-    console.log(`\n  💡 To enable MP3 conversion, install ffmpeg:`);
-    console.log(`     Download from: https://ffmpeg.org/download.html`);
-    console.log(`     Or: winget install Gyan.FFmpeg`);
-  }
+  console.log(`  Limits:  max ${LIMITS.MAX_PLAYLIST_SIZE} videos | ${LIMITS.MAX_CONCURRENT_SESSIONS} concurrent sessions | ${LIMITS.CONCURRENT_DOWNLOADS_PER_SESSION} parallel/session`);
   console.log('');
 });
