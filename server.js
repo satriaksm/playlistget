@@ -3,6 +3,7 @@ const express = require('express');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const archiver = require('archiver');
 const { v4: uuidv4 } = require('uuid');
 const ffmpegStatic = require('ffmpeg-static');
@@ -96,10 +97,20 @@ app.use(rateLimit);
 // Store for download sessions
 const sessions = new Map();
 
-// Ensure downloads directory exists
-const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
-if (!fs.existsSync(DOWNLOADS_DIR)) {
-  fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+// Ensure downloads directory exists (with fallback to OS tmpdir for serverless/restricted environments)
+let DOWNLOADS_DIR = process.env.DOWNLOADS_DIR || path.join(__dirname, 'downloads');
+try {
+  if (!fs.existsSync(DOWNLOADS_DIR)) {
+    fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+  }
+} catch (err) {
+  // Read-only filesystem fallback
+  DOWNLOADS_DIR = path.join(os.tmpdir(), 'playlistget-downloads');
+  try {
+    if (!fs.existsSync(DOWNLOADS_DIR)) {
+      fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+    }
+  } catch {}
 }
 
 // Check if yt-dlp is available
