@@ -276,9 +276,9 @@ app.post('/api/playlist', async (req, res) => {
       '--no-warnings',
       '--ignore-errors',
       '--no-check-certificates',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android,web,tv,ios',
-      '--extractor-args', 'youtubetab:player_client=android,web,tv,ios'
+      '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android',
+      '--extractor-args', 'youtubetab:player_client=android'
     ];
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
@@ -309,7 +309,7 @@ app.post('/api/playlist', async (req, res) => {
 
     let { output, errorOutput } = await extractYtDlpMetadata(args);
 
-    // If flat-playlist produced no output and not Spotify, attempt deep extraction (e.g. single TikTok / Instagram / Facebook posts)
+    // If flat-playlist produced no output and not Spotify, attempt deep extraction (e.g. single TikTok / Instagram / Facebook / YouTube posts)
     if (!output.trim() && !spotifyData) {
       const fallbackArgs = [
         '--dump-json',
@@ -317,8 +317,8 @@ app.post('/api/playlist', async (req, res) => {
         '--no-warnings',
         '--ignore-errors',
         '--no-check-certificates',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        '--extractor-args', 'youtube:player_client=android,web,tv,ios'
+        '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+        '--extractor-args', 'youtube:player_client=android'
       ];
       if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
         fallbackArgs.push('--cookies', LIMITS.COOKIES_PATH);
@@ -329,6 +329,39 @@ app.post('/api/playlist', async (req, res) => {
       if (fallbackResult.output.trim()) {
         output = fallbackResult.output;
         errorOutput = fallbackResult.errorOutput;
+      }
+    }
+
+    // YouTube direct oEmbed fallback if datacenter IP is rate-limited on scraping
+    if (!output.trim() && (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be'))) {
+      try {
+        const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(cleanUrl)}&format=json`);
+        if (oembedRes.ok) {
+          const oembedData = await oembedRes.json();
+          if (oembedData && (oembedData.title || oembedData.author_name)) {
+            let videoId = '';
+            const match = cleanUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/i);
+            if (match) videoId = match[1];
+
+            const track = {
+              id: videoId || cleanUrl,
+              title: oembedData.title || 'YouTube Video',
+              artist: oembedData.author_name || 'YouTube',
+              duration: 0,
+              thumbnail: oembedData.thumbnail_url || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null),
+              url: cleanUrl,
+              platform: 'YouTube'
+            };
+            return res.json({
+              title: track.title,
+              platform: 'YouTube',
+              total: 1,
+              videos: [track]
+            });
+          }
+        }
+      } catch (ytOembedErr) {
+        console.warn('YouTube oEmbed fallback failed:', ytOembedErr.message);
       }
     }
 
@@ -766,8 +799,8 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       '--no-playlist',
       '--no-check-certificates',
       '--no-warnings',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android,web,tv,ios'
+      '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android'
     ];
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
