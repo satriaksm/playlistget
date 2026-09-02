@@ -60,49 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // ---- Initialize ----
-  checkSystem();
+  state.ffmpegAvailable = true;
   setupEventListeners();
-
-  // ---- System Check ----
-  async function checkSystem() {
-    try {
-      const res = await fetch('/api/check');
-      const data = await res.json();
-      state.ffmpegAvailable = data.ffmpegAvailable;
-
-      const dot = els.systemStatus.querySelector('.status-dot');
-      const text = els.systemStatus.querySelector('span');
-
-      if (data.ytDlpAvailable) {
-        dot.classList.add('ready');
-        text.textContent = `yt-dlp v${data.ytDlpVersion}`;
-      } else {
-        dot.classList.add('error');
-        text.textContent = 'yt-dlp not found';
-        showError('yt-dlp is not installed. Please install it from https://github.com/yt-dlp/yt-dlp#installation');
-      }
-
-      // Show ffmpeg warning
-      if (data.ytDlpAvailable && !data.ffmpegAvailable) {
-        const warning = document.createElement('div');
-        warning.className = 'ffmpeg-warning';
-        warning.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          <span><strong>ffmpeg not found.</strong> Audio will be downloaded as .webm/.m4a (no MP3 conversion). 
-          Install ffmpeg: <code>winget install Gyan.FFmpeg</code> or download from <a href="https://ffmpeg.org/download.html" target="_blank">ffmpeg.org</a></span>
-        `;
-        els.inputSection.insertBefore(warning, els.inputSection.querySelector('.input-group'));
-      }
-    } catch {
-      const dot = els.systemStatus.querySelector('.status-dot');
-      const text = els.systemStatus.querySelector('span');
-      dot.classList.add('error');
-      text.textContent = 'Connection error';
-    }
-  }
 
   // ---- Event Listeners ----
   function setupEventListeners() {
