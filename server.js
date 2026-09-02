@@ -94,6 +94,11 @@ app.use(express.json({ limit: LIMITS.MAX_BODY_SIZE }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(rateLimit);
 
+// Explicit root route for Codespaces/Docker environments
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Store for download sessions
 const sessions = new Map();
 
@@ -1135,11 +1140,13 @@ function handleShutdown(signal) {
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 
-app.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
   const ffmpegOk = checkFfmpeg();
   console.log(`\n  🎵 PlaylistGet — Media Downloader`);
   console.log(`  ────────────────────────────────`);
-  console.log(`  Server running at: http://localhost:${PORT}`);
+  console.log(`  Server running at: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   console.log(`  yt-dlp status:  ${checkYtDlp() ? '✅ Available' : '❌ Not found'}`);
   console.log(`  ffmpeg status:  ${ffmpegOk ? '✅ Available' : '⚠️  Not found (MP3 conversion disabled)'}`);
   console.log(`  Limits:  max ${LIMITS.MAX_PLAYLIST_SIZE} videos | ${LIMITS.MAX_CONCURRENT_SESSIONS} concurrent sessions | ${LIMITS.CONCURRENT_DOWNLOADS_PER_SESSION} parallel/session`);
