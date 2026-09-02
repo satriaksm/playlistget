@@ -175,11 +175,11 @@ function ensureYtDlpAvailable() {
 
   if (process.platform === 'linux') {
     try {
-      console.log('  ⬇️ yt-dlp not detected. Installing standalone binary...');
+      console.log('  ⬇️ yt-dlp not detected. Installing standalone Linux binary (yt-dlp_linux)...');
       const targetDir = path.join(os.homedir(), '.local', 'bin');
       if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
       const targetPath = path.join(targetDir, 'yt-dlp');
-      execSync(`curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "${targetPath}" && chmod a+rx "${targetPath}"`, { stdio: 'pipe' });
+      execSync(`curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o "${targetPath}" && chmod a+rx "${targetPath}"`, { stdio: 'inherit' });
       if (checkYtDlp()) {
         console.log(`  ✅ yt-dlp installed automatically to ${targetPath}`);
         return true;
