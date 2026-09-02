@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PlaylistGet — Media Downloader</title>
-  <meta name="description" content="Download video and audio from YouTube, Spotify, TikTok, Instagram, Facebook, and more as MP3 or MP4." />
-  <meta name="keywords" content="media downloader, youtube downloader, spotify to mp3, tiktok downloader, instagram reel download, mp3 320kbps, mp4 1080p" />
+  <meta name="description" content="Download video and audio from YouTube, Spotify, and TikTok as MP3 or MP4." />
+  <meta name="keywords" content="media downloader, youtube downloader, spotify to mp3, tiktok downloader, mp3 320kbps, mp4 1080p" />
   <meta name="author" content="PlaylistGet" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="/" />
@@ -13,13 +13,13 @@
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website" />
   <meta property="og:title" content="PlaylistGet — Media Downloader" />
-  <meta property="og:description" content="Download tracks, playlists, and videos from YouTube, Spotify, TikTok, Instagram, and more." />
+  <meta property="og:description" content="Download tracks, playlists, and videos from YouTube, Spotify, and TikTok." />
   <meta property="og:site_name" content="PlaylistGet" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="PlaylistGet — Media Downloader" />
-  <meta name="twitter:description" content="Download tracks, playlists, and videos from YouTube, Spotify, TikTok, Instagram, and more." />
+  <meta name="twitter:description" content="Download tracks, playlists, and videos from YouTube, Spotify, and TikTok." />
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -63,7 +63,7 @@
           Download <span class="hero-gradient">Video & Audio</span>
         </h2>
         <p class="hero-subtitle">
-          Save playlists, tracks, and videos from <strong>YouTube, Spotify, TikTok, Instagram, Facebook</strong>, and more as MP3 audio or MP4 video.
+          Save playlists, tracks, and videos from <strong>YouTube, Spotify, and TikTok</strong> as MP3 audio or MP4 video.
         </p>
 
         <!-- Platform indicators -->
@@ -87,18 +87,6 @@
             <span>TikTok</span>
           </div>
           <div class="platform-chip">
-            <svg class="chip-icon ig" viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
-              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-            </svg>
-            <span>Instagram</span>
-          </div>
-          <div class="platform-chip">
-            <svg class="chip-icon fb" viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-            <span>Facebook</span>
-          </div>
-          <div class="platform-chip">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
@@ -120,7 +108,7 @@
             <input
               type="url"
               id="playlistUrl"
-              placeholder="Paste a link from YouTube, Spotify, TikTok, Instagram, Facebook, etc..."
+              placeholder="Paste a link from YouTube, Spotify, or TikTok..."
               autocomplete="off"
               spellcheck="false"
             />
@@ -155,9 +143,6 @@
           </button>
           <button type="button" class="example-tag" data-url="https://www.tiktok.com/@scout2015/video/6718335390845095173">
             <span class="example-badge tt">TikTok</span> Video
-          </button>
-          <button type="button" class="example-tag" data-url="https://www.instagram.com/reel/C3s_1YyM9Gg/">
-            <span class="example-badge ig">Instagram</span> Reel
           </button>
         </div>
       </section>
@@ -416,7 +401,7 @@
               </svg>
             </div>
             <h3 class="feature-title">Multiple Platforms</h3>
-            <p class="feature-desc">Download from YouTube, Spotify, TikTok, Instagram, Facebook, Twitter/X, SoundCloud, and more.</p>
+            <p class="feature-desc">Download from YouTube, Spotify, and TikTok as MP3 audio or MP4 video.</p>
           </div>
 
           <div class="feature-card">
@@ -493,7 +478,7 @@
               </svg>
             </button>
             <div class="faq-answer">
-              <p>You can download from YouTube, Spotify, TikTok, Instagram, Facebook, Twitter/X, SoundCloud, and many other websites supported by yt-dlp.</p>
+              <p>You can download from YouTube (single videos & playlists), Spotify (tracks & playlists), and TikTok (videos & audio).</p>
             </div>
           </div>
 

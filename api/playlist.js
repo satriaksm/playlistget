@@ -342,63 +342,14 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 4. Handle Instagram Reels & Posts
-    if (cleanUrl.includes('instagram.com')) {
-      const match = cleanUrl.match(/(?:p|reel|reels|tv)\/([a-zA-Z0-9_-]+)/i);
-      const shortcode = match ? match[1] : '';
-      const title = shortcode ? `Instagram Media (${shortcode})` : 'Instagram Post';
-
-      return res.json({
-        title: title,
-        platform: 'Instagram',
-        platformType: 'ig',
-        count: 1,
-        videos: [{
-          id: `ig_${shortcode || Date.now()}`,
-          title: title,
-          duration: null,
-          durationString: '--:--',
-          thumbnail: '',
-          uploader: 'Instagram Creator',
-          url: cleanUrl,
-          platform: 'Instagram',
-          platformType: 'ig',
-          index: 1
-        }]
+    // 4. Reject Instagram & Facebook on Vercel API edition
+    if (cleanUrl.includes('instagram.com') || cleanUrl.includes('facebook.com') || cleanUrl.includes('fb.watch')) {
+      return res.status(400).json({
+        error: 'Instagram and Facebook downloads are not supported on the Vercel API edition due to Meta platform login restrictions. Please use YouTube, Spotify, or TikTok.'
       });
     }
 
-    // 5. Handle Facebook Videos & Reels
-    if (cleanUrl.includes('facebook.com') || cleanUrl.includes('fb.watch')) {
-      let title = 'Facebook Video';
-      if (cleanUrl.includes('/reel/')) {
-        const match = cleanUrl.match(/\/reel\/([a-zA-Z0-9_-]+)/i);
-        title = match ? `Facebook Reel (${match[1]})` : 'Facebook Reel';
-      } else if (cleanUrl.includes('/watch') || cleanUrl.includes('fb.watch')) {
-        title = 'Facebook Watch Video';
-      }
-
-      return res.json({
-        title: title,
-        platform: 'Facebook',
-        platformType: 'fb',
-        count: 1,
-        videos: [{
-          id: `fb_${Date.now()}`,
-          title: title,
-          duration: null,
-          durationString: '--:--',
-          thumbnail: '',
-          uploader: 'Facebook Creator',
-          url: cleanUrl,
-          platform: 'Facebook',
-          platformType: 'fb',
-          index: 1
-        }]
-      });
-    }
-
-    // 6. Handle other platforms via generic fallback
+    // 5. Handle other platforms via generic fallback
     return res.json({
       title: `${platformInfo.name} Media`,
       platform: platformInfo.name,
