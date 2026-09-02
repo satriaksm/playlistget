@@ -557,13 +557,19 @@ document.addEventListener('DOMContentLoaded', () => {
     hideSection(els.progressSection);
     showSection(els.completeSection);
 
-    els.completeStats.innerHTML = `<strong>${data.completed} file(s) processed successfully</strong>`;
-    if (data.downloadedTitles && data.downloadedTitles.length > 0) {
-      els.completeStats.innerHTML += `<div style="margin-top: 15px; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; font-size: 0.85rem; color: var(--text-secondary); max-height: 180px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05);">
-        <ul style="margin: 0; padding-left: 20px;">
-          ${data.downloadedTitles.map(t => `<li style="margin-bottom: 4px;">${escapeHtml(t)}</li>`).join('')}
-        </ul>
-      </div>`;
+    if (data.completed === 0) {
+      els.completeStats.innerHTML = `<strong style="color: #ef4444;">0 file(s) processed. All downloads failed.</strong>`;
+      els.downloadZipBtn.style.display = 'none';
+    } else {
+      els.downloadZipBtn.style.display = 'inline-flex';
+      els.completeStats.innerHTML = `<strong>${data.completed} file(s) processed successfully</strong>`;
+      if (data.downloadedTitles && data.downloadedTitles.length > 0) {
+        els.completeStats.innerHTML += `<div style="margin-top: 15px; text-align: left; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; font-size: 0.85rem; color: var(--text-secondary); max-height: 180px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.05);">
+          <ul style="margin: 0; padding-left: 20px;">
+            ${data.downloadedTitles.map(t => `<li style="margin-bottom: 4px;">${escapeHtml(t)}</li>`).join('')}
+          </ul>
+        </div>`;
+      }
     }
 
     if (data.failed > 0) {

@@ -120,16 +120,26 @@ try {
 
 // Universal yt-dlp execution helper
 function getYtDlpCommandInfo() {
-  try {
-    execSync('yt-dlp --version', { encoding: 'utf-8', stdio: 'pipe' });
-    return { cmd: 'yt-dlp', baseArgs: [] };
-  } catch {}
+  const candidates = [
+    { cmd: 'yt-dlp', baseArgs: [] },
+    { cmd: '/usr/local/bin/yt-dlp', baseArgs: [] },
+    { cmd: '/usr/bin/yt-dlp', baseArgs: [] },
+    { cmd: path.join(os.homedir(), '.local/bin/yt-dlp'), baseArgs: [] },
+    { cmd: 'python3', baseArgs: ['-m', 'yt_dlp'] },
+    { cmd: 'python', baseArgs: ['-m', 'yt_dlp'] },
+    { cmd: 'py', baseArgs: ['-m', 'yt_dlp'] }
+  ];
 
-  try {
-    const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
-    execSync(`${pythonExe} -m yt_dlp --version`, { encoding: 'utf-8', stdio: 'pipe' });
-    return { cmd: pythonExe, baseArgs: ['-m', 'yt_dlp'] };
-  } catch {}
+  for (const c of candidates) {
+    try {
+      if (c.baseArgs.length > 0) {
+        execSync(`${c.cmd} ${c.baseArgs.join(' ')} --version`, { encoding: 'utf-8', stdio: 'pipe' });
+      } else {
+        execSync(`${c.cmd} --version`, { encoding: 'utf-8', stdio: 'pipe' });
+      }
+      return c;
+    } catch {}
+  }
 
   return { cmd: 'yt-dlp', baseArgs: [] };
 }
@@ -155,6 +165,28 @@ function checkYtDlp() {
   } catch {
     return false;
   }
+}
+
+// Auto-download yt-dlp on Linux/Codespaces if missing
+function ensureYtDlpAvailable() {
+  if (checkYtDlp()) return true;
+
+  if (process.platform === 'linux') {
+    try {
+      console.log('  ⬇️ yt-dlp not detected. Installing standalone binary...');
+      const targetDir = path.join(os.homedir(), '.local', 'bin');
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      const targetPath = path.join(targetDir, 'yt-dlp');
+      execSync(`curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "${targetPath}" && chmod a+rx "${targetPath}"`, { stdio: 'pipe' });
+      if (checkYtDlp()) {
+        console.log(`  ✅ yt-dlp installed automatically to ${targetPath}`);
+        return true;
+      }
+    } catch (autoErr) {
+      console.warn(`  ⚠️ Auto-install of yt-dlp failed: ${autoErr.message}`);
+    }
+  }
+  return false;
 }
 
 // Check if ffmpeg is available
@@ -1142,13 +1174,17 @@ process.on('SIGINT', () => handleShutdown('SIGINT'));
 
 const HOST = process.env.HOST || '0.0.0.0';
 
+// Ensure yt-dlp availability on launch
+ensureYtDlpAvailable();
+
 app.listen(PORT, HOST, () => {
+  const ytdlpOk = checkYtDlp();
   const ffmpegOk = checkFfmpeg();
   console.log(`\n  🎵 PlaylistGet — Media Downloader`);
   console.log(`  ────────────────────────────────`);
   console.log(`  Server running at: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
-  console.log(`  yt-dlp status:  ${checkYtDlp() ? '✅ Available' : '❌ Not found'}`);
-  console.log(`  ffmpeg status:  ${ffmpegOk ? '✅ Available' : '⚠️  Not found (MP3 conversion disabled)'}`);
+  console.log(`  yt-dlp status:  ${ytdlpOk ? '✅ Available' : '❌ Not found (Run: sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && sudo chmod a+rx /usr/local/bin/yt-dlp)'}`);
+  console.log(`  ffmpeg status:  ${ffmpegOk ? '✅ Available' : '⚠️  Not found'}`);
   console.log(`  Limits:  max ${LIMITS.MAX_PLAYLIST_SIZE} videos | ${LIMITS.MAX_CONCURRENT_SESSIONS} concurrent sessions | ${LIMITS.CONCURRENT_DOWNLOADS_PER_SESSION} parallel/session`);
   console.log('');
 });
