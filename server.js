@@ -123,10 +123,12 @@ function getYtDlpCommandInfo() {
   const candidates = [
     { cmd: 'yt-dlp', baseArgs: [] },
     { cmd: '/usr/local/bin/yt-dlp', baseArgs: [] },
+    { cmd: 'python3', baseArgs: ['/usr/local/bin/yt-dlp'] },
+    { cmd: 'python3', baseArgs: ['-m', 'yt_dlp'] },
+    { cmd: 'python', baseArgs: ['/usr/local/bin/yt-dlp'] },
+    { cmd: 'python', baseArgs: ['-m', 'yt_dlp'] },
     { cmd: '/usr/bin/yt-dlp', baseArgs: [] },
     { cmd: path.join(os.homedir(), '.local/bin/yt-dlp'), baseArgs: [] },
-    { cmd: 'python3', baseArgs: ['-m', 'yt_dlp'] },
-    { cmd: 'python', baseArgs: ['-m', 'yt_dlp'] },
     { cmd: 'py', baseArgs: ['-m', 'yt_dlp'] }
   ];
 
