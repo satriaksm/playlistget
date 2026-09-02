@@ -275,7 +275,10 @@ app.post('/api/playlist', async (req, res) => {
       '--dump-json',
       '--no-warnings',
       '--ignore-errors',
-      '--no-check-certificates'
+      '--no-check-certificates',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android,web,tv,ios',
+      '--extractor-args', 'youtubetab:player_client=android,web,tv,ios'
     ];
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
@@ -313,7 +316,9 @@ app.post('/api/playlist', async (req, res) => {
         '--no-playlist',
         '--no-warnings',
         '--ignore-errors',
-        '--no-check-certificates'
+        '--no-check-certificates',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        '--extractor-args', 'youtube:player_client=android,web,tv,ios'
       ];
       if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
         fallbackArgs.push('--cookies', LIMITS.COOKIES_PATH);
@@ -324,6 +329,35 @@ app.post('/api/playlist', async (req, res) => {
       if (fallbackResult.output.trim()) {
         output = fallbackResult.output;
         errorOutput = fallbackResult.errorOutput;
+      }
+    }
+
+    // TikTok direct oEmbed fallback if scraping was rate-limited
+    if (!output.trim() && (cleanUrl.includes('tiktok.com') || cleanUrl.includes('douyin.com'))) {
+      try {
+        const oembedRes = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`);
+        if (oembedRes.ok) {
+          const oembedData = await oembedRes.json();
+          if (oembedData && (oembedData.title || oembedData.author_name)) {
+            const track = {
+              id: cleanUrl,
+              title: oembedData.title || `TikTok by ${oembedData.author_name || 'Creator'}`,
+              artist: oembedData.author_name || 'TikTok',
+              duration: 0,
+              thumbnail: oembedData.thumbnail_url || null,
+              url: cleanUrl,
+              platform: 'TikTok'
+            };
+            return res.json({
+              title: track.title,
+              platform: 'TikTok',
+              total: 1,
+              videos: [track]
+            });
+          }
+        }
+      } catch (oembedErr) {
+        console.warn('TikTok oEmbed fallback failed:', oembedErr.message);
       }
     }
 
@@ -731,7 +765,9 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       '-o', outputTemplate,
       '--no-playlist',
       '--no-check-certificates',
-      '--no-warnings'
+      '--no-warnings',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android,web,tv,ios'
     ];
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
