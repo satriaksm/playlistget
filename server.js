@@ -266,19 +266,142 @@ app.post('/api/playlist', async (req, res) => {
     return res.status(400).json({ error: 'URL is too long.' });
   }
 
+  // Normalize YouTube Music & YouTube playlist URLs for complete full-playlist extraction
+  let targetUrl = cleanUrl;
+  try {
+    const parsed = new URL(cleanUrl);
+    if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
+      const listId = parsed.searchParams.get('list');
+      if (listId && !listId.startsWith('RD') && !listId.startsWith('LL')) {
+        targetUrl = `https://www.youtube.com/playlist?list=${listId}`;
+      } else if (parsed.hostname.includes('music.youtube.com') && parsed.pathname.includes('/playlist')) {
+        targetUrl = cleanUrl.replace('music.youtube.com', 'www.youtube.com');
+      }
+    }
+  } catch {}
+
   const platformInfo = detectPlatformInfo(cleanUrl);
   const spotifyRegex = /^(https?:\/\/)?(www\.)?open\.spotify\.com\/(playlist|track|album|artist)\/.+/i;
+
+  // Instant Spotify metadata resolution with individual track covers
+  if (spotifyRegex.test(cleanUrl)) {
+    try {
+      const spotifyData = await spotifyUrlInfo.getData(cleanUrl);
+      if (spotifyData) {
+        if (spotifyData.type === 'track') {
+          const artist = spotifyData.artists?.[0]?.name || spotifyData.artist || 'Unknown';
+          const title = spotifyData.name || 'Spotify Track';
+          let cover = spotifyData.coverArt?.sources?.[0]?.url || spotifyData.thumbnail || '';
+          if (!cover) {
+            const trackId = cleanUrl.match(/track\/([a-zA-Z0-9]+)/)?.[1];
+            if (trackId) {
+              try {
+                const oembedRes = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`);
+                if (oembedRes.ok) {
+                  const oembedData = await oembedRes.json();
+                  cover = oembedData?.thumbnail_url || '';
+                }
+              } catch {}
+            }
+          }
+          const durationSec = spotifyData.duration ? Math.floor(spotifyData.duration / 1000) : null;
+
+          return res.json({
+            title: `${title} - ${artist}`,
+            platform: 'Spotify',
+            platformType: 'sp',
+            count: 1,
+            videos: [{
+              id: `spotify_track_${Date.now()}`,
+              title: `${title} - ${artist}`,
+              duration: durationSec,
+              durationString: formatDuration(durationSec),
+              thumbnail: cover,
+              uploader: artist,
+              url: `ytsearch1:${title} ${artist}`,
+              platform: 'Spotify',
+              platformType: 'sp',
+              index: 1
+            }]
+          });
+        } else if (spotifyData.trackList && spotifyData.trackList.length > 0) {
+          const playlistCover = spotifyData.coverArt?.sources?.[0]?.url || spotifyData.thumbnail || '';
+          const rawTracks = spotifyData.trackList.slice(0, LIMITS.MAX_PLAYLIST_SIZE || 200);
+
+          // Fetch distinct album art for each track in parallel
+          const coverPromises = rawTracks.map(async (track) => {
+            if (track.coverArt?.sources?.[0]?.url) {
+              return track.coverArt.sources[0].url;
+            }
+            const trackId = track.uri ? track.uri.split(':').pop() : '';
+            if (!trackId) return playlistCover;
+
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 2000);
+              const oembedRes = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`, {
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+              if (oembedRes.ok) {
+                const oembedData = await oembedRes.json();
+                if (oembedData && oembedData.thumbnail_url) {
+                  return oembedData.thumbnail_url;
+                }
+              }
+            } catch {}
+            return playlistCover;
+          });
+
+          const individualCovers = await Promise.all(coverPromises);
+
+          const videos = rawTracks.map((track, index) => {
+            const artist = track.subtitle || (track.artists?.[0]?.name) || spotifyData.name || 'Spotify Artist';
+            const title = track.title || track.name || `Track ${index + 1}`;
+            const cover = individualCovers[index] || playlistCover || '';
+            const durationSec = track.duration ? Math.floor(track.duration / 1000) : null;
+
+            return {
+              id: track.uri || `spotify_track_${index + 1}_${Date.now()}`,
+              title: `${title} - ${artist}`,
+              duration: durationSec,
+              durationString: formatDuration(durationSec),
+              thumbnail: cover,
+              uploader: artist,
+              url: `ytsearch1:${title} ${artist}`,
+              platform: 'Spotify',
+              platformType: 'sp',
+              index: index + 1
+            };
+          });
+
+          return res.json({
+            title: spotifyData.name || 'Spotify Playlist',
+            platform: 'Spotify',
+            platformType: 'sp',
+            count: videos.length,
+            videos
+          });
+        }
+      }
+    } catch (spotifyErr) {
+      console.warn('Spotify metadata error:', spotifyErr.message);
+      return res.status(400).json({ error: 'Could not fetch tracks from Spotify. Make sure the playlist or track is public.' });
+    }
+  }
 
   try {
     let args = [
       '--flat-playlist',
       '--dump-json',
+      '--yes-playlist',
+      '--compat-options', 'no-youtube-unavailable-videos',
+      '--playlist-end', String(LIMITS.MAX_PLAYLIST_SIZE || 200),
       '--no-warnings',
       '--ignore-errors',
       '--no-check-certificates',
-      '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android',
-      '--extractor-args', 'youtubetab:player_client=android'
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android'
     ];
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
@@ -288,24 +411,7 @@ app.post('/api/playlist', async (req, res) => {
     let customTitle = null;
     let spotifyData = null;
 
-    if (spotifyRegex.test(cleanUrl)) {
-      // Fetch Spotify metadata
-      spotifyData = await spotifyUrlInfo.getData(cleanUrl);
-      
-      if (spotifyData.type === 'track') {
-        customTitle = `${spotifyData.name} - ${spotifyData.artists?.[0]?.name || 'Unknown'}`;
-        args.push('--', `ytsearch1:${spotifyData.name} ${spotifyData.artists?.[0]?.name || ''}`);
-      } else if (spotifyData.trackList && spotifyData.trackList.length > 0) {
-        customTitle = spotifyData.name;
-        spotifyData.trackList.forEach(track => {
-          args.push('--', `ytsearch1:${track.title} ${track.subtitle || ''}`);
-        });
-      } else {
-        return res.status(400).json({ error: 'Could not fetch tracks from Spotify URL.' });
-      }
-    } else {
-      args.push('--', cleanUrl);
-    }
+    args.push('--', targetUrl);
 
     let { output, errorOutput } = await extractYtDlpMetadata(args);
 
@@ -317,13 +423,13 @@ app.post('/api/playlist', async (req, res) => {
         '--no-warnings',
         '--ignore-errors',
         '--no-check-certificates',
-        '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         '--extractor-args', 'youtube:player_client=android'
       ];
       if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
         fallbackArgs.push('--cookies', LIMITS.COOKIES_PATH);
       }
-      fallbackArgs.push('--', cleanUrl);
+      fallbackArgs.push('--', targetUrl);
 
       const fallbackResult = await extractYtDlpMetadata(fallbackArgs);
       if (fallbackResult.output.trim()) {
@@ -332,8 +438,9 @@ app.post('/api/playlist', async (req, res) => {
       }
     }
 
-    // YouTube direct oEmbed fallback if datacenter IP is rate-limited on scraping
-    if (!output.trim() && (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be'))) {
+    // YouTube direct oEmbed fallback if datacenter IP is rate-limited (for SINGLE video only, not playlist)
+    const isPlaylistUrl = cleanUrl.includes('list=') || cleanUrl.includes('/playlist') || cleanUrl.includes('/album') || cleanUrl.includes('/sets/');
+    if (!output.trim() && !isPlaylistUrl && (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be'))) {
       try {
         const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(cleanUrl)}&format=json`);
         if (oembedRes.ok) {
@@ -777,7 +884,9 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     session.currentProgress = 0;
 
     let videoUrl = video.url;
-    if (!videoUrl || !videoUrl.startsWith('http')) {
+    if (videoUrl && (videoUrl.startsWith('ytsearch1:') || videoUrl.startsWith('ytsearch:'))) {
+      // Direct search query from Spotify/Metadata resolution
+    } else if (!videoUrl || !videoUrl.startsWith('http')) {
       if (video.id && video.id.startsWith('http')) {
         videoUrl = video.id;
       } else if (video.id) {
@@ -799,7 +908,7 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       '--no-playlist',
       '--no-check-certificates',
       '--no-warnings',
-      '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
       '--extractor-args', 'youtube:player_client=android'
     ];
 
