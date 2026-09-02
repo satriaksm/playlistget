@@ -342,7 +342,33 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 4. Handle other platforms via oEmbed or generic fallback
+    // 4. Handle Instagram Reels & Posts
+    if (cleanUrl.includes('instagram.com')) {
+      const match = cleanUrl.match(/(?:p|reel|reels|tv)\/([a-zA-Z0-9_-]+)/i);
+      const shortcode = match ? match[1] : '';
+      const title = shortcode ? `Instagram Media (${shortcode})` : 'Instagram Post';
+
+      return res.json({
+        title: title,
+        platform: 'Instagram',
+        platformType: 'ig',
+        count: 1,
+        videos: [{
+          id: `ig_${shortcode || Date.now()}`,
+          title: title,
+          duration: null,
+          durationString: '--:--',
+          thumbnail: '',
+          uploader: 'Instagram Creator',
+          url: cleanUrl,
+          platform: 'Instagram',
+          platformType: 'ig',
+          index: 1
+        }]
+      });
+    }
+
+    // 5. Handle other platforms via generic fallback
     return res.json({
       title: `${platformInfo.name} Media`,
       platform: platformInfo.name,
