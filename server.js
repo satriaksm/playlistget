@@ -113,11 +113,40 @@ try {
   } catch {}
 }
 
+// Universal yt-dlp execution helper
+function getYtDlpCommandInfo() {
+  try {
+    execSync('yt-dlp --version', { encoding: 'utf-8', stdio: 'pipe' });
+    return { cmd: 'yt-dlp', baseArgs: [] };
+  } catch {}
+
+  try {
+    const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
+    execSync(`${pythonExe} -m yt_dlp --version`, { encoding: 'utf-8', stdio: 'pipe' });
+    return { cmd: pythonExe, baseArgs: ['-m', 'yt_dlp'] };
+  } catch {}
+
+  return { cmd: 'yt-dlp', baseArgs: [] };
+}
+
+function spawnYtDlp(args) {
+  const { cmd, baseArgs } = getYtDlpCommandInfo();
+  return spawn(cmd, [...baseArgs, ...args]);
+}
+
+function execYtDlpSync(argsStr) {
+  const { cmd, baseArgs } = getYtDlpCommandInfo();
+  if (baseArgs.length > 0) {
+    return execSync(`${cmd} ${baseArgs.join(' ')} ${argsStr}`, { encoding: 'utf-8', stdio: 'pipe' });
+  }
+  return execSync(`${cmd} ${argsStr}`, { encoding: 'utf-8', stdio: 'pipe' });
+}
+
 // Check if yt-dlp is available
 function checkYtDlp() {
   try {
-    execSync('yt-dlp --version', { encoding: 'utf-8', stdio: 'pipe' });
-    return true;
+    const out = execYtDlpSync('--version');
+    return !!(out && out.trim());
   } catch {
     return false;
   }
@@ -132,6 +161,26 @@ function checkFfmpeg() {
   } catch {
     return false;
   }
+}
+
+// Detect media platform for UI enrichment
+function detectPlatformInfo(url) {
+  const u = (url || '').toLowerCase();
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return { name: 'YouTube', type: 'yt' };
+  if (u.includes('spotify.com')) return { name: 'Spotify', type: 'sp' };
+  if (u.includes('tiktok.com')) return { name: 'TikTok', type: 'tt' };
+  if (u.includes('instagram.com')) return { name: 'Instagram', type: 'ig' };
+  if (u.includes('facebook.com') || u.includes('fb.watch') || u.includes('fb.com')) return { name: 'Facebook', type: 'fb' };
+  if (u.includes('twitter.com') || u.includes('x.com')) return { name: 'Twitter / X', type: 'tw' };
+  if (u.includes('soundcloud.com')) return { name: 'SoundCloud', type: 'sc' };
+  if (u.includes('reddit.com') || u.includes('redd.it')) return { name: 'Reddit', type: 'rd' };
+  if (u.includes('vimeo.com')) return { name: 'Vimeo', type: 'vm' };
+  if (u.includes('pinterest.com') || u.includes('pin.it')) return { name: 'Pinterest', type: 'pt' };
+  if (u.includes('twitch.tv')) return { name: 'Twitch', type: 'twc' };
+  if (u.includes('threads.net')) return { name: 'Threads', type: 'th' };
+  if (u.includes('bilibili.com') || u.includes('b23.tv')) return { name: 'Bilibili', type: 'bi' };
+  if (u.includes('dailymotion.com') || u.includes('dai.ly')) return { name: 'Dailymotion', type: 'dm' };
+  return { name: 'Universal Media', type: 'generic' };
 }
 
 // API: Health Check
@@ -153,7 +202,7 @@ app.get('/api/check', (req, res) => {
   let ytDlpVersion = null;
   if (ytDlpAvailable) {
     try {
-      ytDlpVersion = execSync('yt-dlp --version', { encoding: 'utf-8', stdio: 'pipe' }).trim();
+      ytDlpVersion = execYtDlpSync('--version').trim();
     } catch {}
   }
   res.json({
@@ -168,61 +217,10 @@ app.get('/api/check', (req, res) => {
   });
 });
 
-// API: Fetch playlist info
-app.post('/api/playlist', async (req, res) => {
-  const { url } = req.body;
-
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
-
-  const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be)\/.+/;
-  const spotifyRegex = /^(https?:\/\/)?(www\.)?open\.spotify\.com\/(playlist|track|album)\/.+/;
-
-  if (!ytRegex.test(url) && !spotifyRegex.test(url)) {
-    return res.status(400).json({ error: 'Invalid URL. Please provide a valid YouTube or Spotify URL.' });
-  }
-
-  // Reject URLs that are suspiciously long
-  if (url.length > 500) {
-    return res.status(400).json({ error: 'URL is too long.' });
-  }
-
-  try {
-    let args = [
-      '--flat-playlist',
-      '--dump-json',
-      '--no-warnings',
-      '--ignore-errors'
-    ];
-
-    if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
-      args.push('--cookies', LIMITS.COOKIES_PATH);
-    }
-
-    let customTitle = null;
-    let spotifyData = null;
-
-    if (spotifyRegex.test(url)) {
-      // Fetch Spotify metadata
-      spotifyData = await spotifyUrlInfo.getData(url);
-      
-      if (spotifyData.type === 'track') {
-        customTitle = `${spotifyData.name} - ${spotifyData.artists[0]?.name || 'Unknown'}`;
-        args.push('--', `ytsearch1:${spotifyData.name} ${spotifyData.artists[0]?.name || ''}`);
-      } else if (spotifyData.trackList && spotifyData.trackList.length > 0) {
-        customTitle = spotifyData.name;
-        spotifyData.trackList.forEach(track => {
-          args.push('--', `ytsearch1:${track.title} ${track.subtitle || ''}`);
-        });
-      } else {
-        return res.status(400).json({ error: 'Could not fetch tracks from Spotify URL.' });
-      }
-    } else {
-      args.push('--', url);
-    }
-
-    const ytdlp = spawn('yt-dlp', args);
+// Helper to run yt-dlp metadata extraction
+function extractYtDlpMetadata(args) {
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawnYtDlp(args);
     let output = '';
     let errorOutput = '';
 
@@ -235,92 +233,210 @@ app.post('/api/playlist', async (req, res) => {
     });
 
     ytdlp.on('close', (code) => {
-      if (!output.trim()) {
-        const isBotCheck = errorOutput.includes('Sign in to confirm') || errorOutput.includes('bot');
-        const userFriendlyError = isBotCheck
-          ? 'YouTube meminta verifikasi bot pada server saat ini. Silakan coba link lain atau hubungi admin.'
-          : 'Could not fetch playlist. Make sure the URL is valid, public, and not restricted.';
-
-        return res.status(400).json({
-          error: userFriendlyError,
-          details: errorOutput
-        });
-      }
-
-      try {
-        const entries = output.trim().split('\n').map(line => {
-          try {
-            return JSON.parse(line);
-          } catch {
-            return null;
-          }
-        }).filter(Boolean);
-
-        if (entries.length === 0) {
-          return res.status(400).json({ error: 'No videos found.' });
-        }
-
-        // Extract title
-        const playlistTitle = customTitle || entries[0].playlist_title || entries[0].playlist || entries[0].title || 'Unknown Playlist/Video';
-
-        const videos = entries.map((entry, index) => {
-          let rawTitle = entry.title || `Video ${index + 1}`;
-          let rawUploader = entry.uploader || entry.channel || entry.artist || entry.creator || null;
-
-          if (spotifyData) {
-            if (spotifyData.type === 'track') {
-              rawTitle = spotifyData.name;
-              rawUploader = spotifyData.artists[0]?.name || rawUploader;
-            } else if (spotifyData.trackList && spotifyData.trackList[index]) {
-              rawTitle = spotifyData.trackList[index].title;
-              rawUploader = spotifyData.trackList[index].subtitle || rawUploader;
-            }
-          }
-
-          // If uploader is missing, attempt parsing "Artist - Title" from rawTitle
-          if (!rawUploader && rawTitle.includes(' - ')) {
-            const parts = rawTitle.split(' - ');
-            rawUploader = parts[0].trim();
-          }
-
-          // Clean uploader name
-          const cleanArtist = rawUploader
-            ? rawUploader.replace(/\s*-\s*Topic$/i, '').replace(/\s*VEVO$/i, '').trim()
-            : null;
-
-          // Build display title as "Judul - Penyanyi" if not already present
-          let displayTitle = rawTitle;
-          if (cleanArtist && cleanArtist !== 'Unknown' && cleanArtist.toLowerCase() !== 'various artists') {
-            if (!rawTitle.toLowerCase().includes(cleanArtist.toLowerCase())) {
-              displayTitle = `${rawTitle} - ${cleanArtist}`;
-            }
-          }
-
-          return {
-            id: entry.id || entry.url,
-            title: displayTitle,
-            duration: entry.duration || null,
-            durationString: entry.duration_string || formatDuration(entry.duration),
-            thumbnail: entry.thumbnails?.[entry.thumbnails.length - 1]?.url
-              || `https://img.youtube.com/vi/${entry.id}/mqdefault.jpg`,
-            uploader: cleanArtist || 'Auto-detected on download',
-            url: entry.url || entry.webpage_url || `https://www.youtube.com/watch?v=${entry.id}`,
-            index: index + 1
-          };
-        });
-
-        res.json({
-          title: playlistTitle,
-          count: videos.length,
-          videos
-        });
-      } catch (parseError) {
-        res.status(500).json({ error: 'Failed to parse playlist data.', details: parseError.message });
-      }
+      resolve({ code, output, errorOutput });
     });
 
     ytdlp.on('error', (err) => {
-      res.status(500).json({ error: 'Failed to execute yt-dlp.', details: err.message });
+      reject(err);
+    });
+  });
+}
+
+// API: Fetch playlist / media info (Supports YouTube, Spotify, TikTok, Instagram, Facebook, Twitter, SoundCloud, etc.)
+app.post('/api/playlist', async (req, res) => {
+  const { url } = req.body;
+
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  let cleanUrl = url.trim();
+  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    cleanUrl = 'https://' + cleanUrl;
+  }
+
+  try {
+    new URL(cleanUrl);
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL. Please provide a valid web link.' });
+  }
+
+  // Reject URLs that are suspiciously long
+  if (cleanUrl.length > 1000) {
+    return res.status(400).json({ error: 'URL is too long.' });
+  }
+
+  const platformInfo = detectPlatformInfo(cleanUrl);
+  const spotifyRegex = /^(https?:\/\/)?(www\.)?open\.spotify\.com\/(playlist|track|album|artist)\/.+/i;
+
+  try {
+    let args = [
+      '--flat-playlist',
+      '--dump-json',
+      '--no-warnings',
+      '--ignore-errors',
+      '--no-check-certificates'
+    ];
+
+    if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
+      args.push('--cookies', LIMITS.COOKIES_PATH);
+    }
+
+    let customTitle = null;
+    let spotifyData = null;
+
+    if (spotifyRegex.test(cleanUrl)) {
+      // Fetch Spotify metadata
+      spotifyData = await spotifyUrlInfo.getData(cleanUrl);
+      
+      if (spotifyData.type === 'track') {
+        customTitle = `${spotifyData.name} - ${spotifyData.artists?.[0]?.name || 'Unknown'}`;
+        args.push('--', `ytsearch1:${spotifyData.name} ${spotifyData.artists?.[0]?.name || ''}`);
+      } else if (spotifyData.trackList && spotifyData.trackList.length > 0) {
+        customTitle = spotifyData.name;
+        spotifyData.trackList.forEach(track => {
+          args.push('--', `ytsearch1:${track.title} ${track.subtitle || ''}`);
+        });
+      } else {
+        return res.status(400).json({ error: 'Could not fetch tracks from Spotify URL.' });
+      }
+    } else {
+      args.push('--', cleanUrl);
+    }
+
+    let { output, errorOutput } = await extractYtDlpMetadata(args);
+
+    // If flat-playlist produced no output and not Spotify, attempt deep extraction (e.g. single TikTok / Instagram / Facebook posts)
+    if (!output.trim() && !spotifyData) {
+      const fallbackArgs = [
+        '--dump-json',
+        '--no-playlist',
+        '--no-warnings',
+        '--ignore-errors',
+        '--no-check-certificates'
+      ];
+      if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
+        fallbackArgs.push('--cookies', LIMITS.COOKIES_PATH);
+      }
+      fallbackArgs.push('--', cleanUrl);
+
+      const fallbackResult = await extractYtDlpMetadata(fallbackArgs);
+      if (fallbackResult.output.trim()) {
+        output = fallbackResult.output;
+        errorOutput = fallbackResult.errorOutput;
+      }
+    }
+
+    if (!output.trim()) {
+      const isBotCheck = errorOutput.includes('Sign in to confirm') || errorOutput.includes('bot') || errorOutput.includes('login_required');
+      const isGeoBlocked = errorOutput.includes('not available in your country') || errorOutput.includes('geo restriction');
+      const isPrivate = errorOutput.includes('Private video') || errorOutput.includes('login') || errorOutput.includes('Private');
+
+      let userFriendlyError = `Could not fetch media from ${platformInfo.name}. Make sure the link is public and accessible.`;
+      if (isBotCheck) {
+        userFriendlyError = `${platformInfo.name} requires verification or cookies. Please try another link or configure cookies.txt.`;
+      } else if (isGeoBlocked) {
+        userFriendlyError = `This media from ${platformInfo.name} is geo-restricted in this server region.`;
+      } else if (isPrivate) {
+        userFriendlyError = `This post or video on ${platformInfo.name} is private or requires logging in.`;
+      }
+
+      return res.status(400).json({
+        error: userFriendlyError,
+        details: errorOutput
+      });
+    }
+
+    const entries = output.trim().split('\n').map(line => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
+
+    if (entries.length === 0) {
+      return res.status(400).json({ error: `No downloadable media found on ${platformInfo.name}.` });
+    }
+
+    // Extract title
+    const playlistTitle = customTitle
+      || entries[0].playlist_title
+      || entries[0].playlist
+      || entries[0].title
+      || entries[0].fulltitle
+      || entries[0].description?.substring(0, 50)
+      || `${platformInfo.name} Media`;
+
+    const videos = entries.map((entry, index) => {
+      let rawTitle = entry.title || entry.fulltitle || entry.description?.substring(0, 80) || `Media ${index + 1}`;
+      let rawUploader = entry.uploader || entry.channel || entry.artist || entry.creator || entry.uploader_id || platformInfo.name;
+
+      if (spotifyData) {
+        if (spotifyData.type === 'track') {
+          rawTitle = spotifyData.name;
+          rawUploader = spotifyData.artists?.[0]?.name || rawUploader;
+        } else if (spotifyData.trackList && spotifyData.trackList[index]) {
+          rawTitle = spotifyData.trackList[index].title;
+          rawUploader = spotifyData.trackList[index].subtitle || rawUploader;
+        }
+      }
+
+      // If uploader is missing or generic, attempt parsing "Artist - Title" from rawTitle
+      if ((!rawUploader || rawUploader === platformInfo.name) && rawTitle.includes(' - ')) {
+        const parts = rawTitle.split(' - ');
+        rawUploader = parts[0].trim();
+      }
+
+      // Clean uploader name
+      const cleanArtist = rawUploader
+        ? rawUploader.replace(/\s*-\s*Topic$/i, '').replace(/\s*VEVO$/i, '').trim()
+        : platformInfo.name;
+
+      // Build display title as "Judul - Penyanyi" if not already present
+      let displayTitle = rawTitle;
+      if (cleanArtist && cleanArtist !== 'Unknown' && cleanArtist.toLowerCase() !== 'various artists' && cleanArtist !== platformInfo.name) {
+        if (!rawTitle.toLowerCase().includes(cleanArtist.toLowerCase())) {
+          displayTitle = `${rawTitle} - ${cleanArtist}`;
+        }
+      }
+
+      // Determine robust thumbnail
+      let thumbUrl = entry.thumbnail || entry.thumbnails?.[entry.thumbnails.length - 1]?.url;
+      if (!thumbUrl && platformInfo.type === 'yt' && entry.id) {
+        thumbUrl = `https://img.youtube.com/vi/${entry.id}/mqdefault.jpg`;
+      }
+
+      // Determine direct webpage url
+      let directUrl = entry.webpage_url || (entry.url && entry.url.startsWith('http') ? entry.url : null);
+      if (!directUrl) {
+        if (platformInfo.type === 'yt' && entry.id) {
+          directUrl = `https://www.youtube.com/watch?v=${entry.id}`;
+        } else {
+          directUrl = cleanUrl;
+        }
+      }
+
+      return {
+        id: entry.id || entry.url || `track_${index + 1}_${Date.now()}`,
+        title: displayTitle,
+        duration: entry.duration || null,
+        durationString: entry.duration_string || formatDuration(entry.duration),
+        thumbnail: thumbUrl || '',
+        uploader: cleanArtist || platformInfo.name,
+        url: directUrl,
+        platform: platformInfo.name,
+        platformType: platformInfo.type,
+        index: index + 1
+      };
+    });
+
+    res.json({
+      title: playlistTitle,
+      platform: platformInfo.name,
+      platformType: platformInfo.type,
+      count: videos.length,
+      videos
     });
   } catch (err) {
     res.status(500).json({ error: 'Server error: ' + err.message });
@@ -593,15 +709,15 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
   return new Promise((resolve, reject) => {
     session.currentProgress = 0;
 
-    let videoUrl;
-    if (video.url && video.url.startsWith('http')) {
-      videoUrl = video.url;
-    } else if (video.id) {
-      videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    } else if (video.url) {
-      videoUrl = `https://www.youtube.com/watch?v=${video.url}`;
-    } else {
-      return reject(new Error('No valid video URL or ID'));
+    let videoUrl = video.url;
+    if (!videoUrl || !videoUrl.startsWith('http')) {
+      if (video.id && video.id.startsWith('http')) {
+        videoUrl = video.id;
+      } else if (video.id) {
+        videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
+      } else {
+        return reject(new Error('No valid video or media URL'));
+      }
     }
 
     let filesBefore = new Set();
@@ -643,12 +759,12 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     } else if (format === 'mp4') {
       if (ffmpegAvailable) {
         const formatStr = quality === '1080p'
-          ? 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+          ? 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080][ext=mp4]/best[height<=1080]/best'
           : quality === 'best'
-            ? 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+            ? 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best'
             : quality === '720p'
-              ? 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best'
-              : 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best';
+              ? 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720][ext=mp4]/best[height<=720]/best'
+              : 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480][ext=mp4]/best[height<=480]/best';
         args.push('-f', formatStr, '--merge-output-format', 'mp4');
       } else {
         args.push('-f', 'best[ext=mp4]/best');
@@ -658,7 +774,7 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
     // Safety separator before positional argument
     args.push('--', videoUrl);
 
-    const ytdlp = spawn('yt-dlp', args);
+    const ytdlp = spawnYtDlp(args);
     if (!session.activeProcesses) session.activeProcesses = [];
     session.activeProcesses.push(ytdlp);
 

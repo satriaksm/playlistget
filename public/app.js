@@ -281,6 +281,16 @@ document.addEventListener('DOMContentLoaded', () => {
       item.dataset.id = video.id;
       item.dataset.title = (video.title || '').toLowerCase();
       item.dataset.uploader = (video.uploader || '').toLowerCase();
+      
+      const pType = video.platformType || 'generic';
+      const pName = video.platform || 'Media';
+      const platformTagHtml = `<span class="track-platform-tag ${pType}">${escapeHtml(pName)}</span>`;
+
+      const thumbHtml = video.thumbnail
+        ? `<img class="video-thumb" src="${escapeHtml(video.thumbnail)}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.querySelector('.video-thumb-fallback')?.classList.remove('hidden'); this.remove();" />
+           <div class="video-thumb-fallback hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`
+        : `<div class="video-thumb-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+
       item.innerHTML = `
         <div class="video-checkbox">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -288,11 +298,11 @@ document.addEventListener('DOMContentLoaded', () => {
           </svg>
         </div>
         <span class="video-index">${video.index}</span>
-        <img class="video-thumb" src="${video.thumbnail}" alt="" loading="lazy"
-             onerror="this.style.display='none'" />
+        ${thumbHtml}
         <div class="video-info">
           <div class="video-title" title="${escapeHtml(video.title)}">${escapeHtml(video.title)}</div>
           <div class="video-meta">
+            ${platformTagHtml}
             <span>${escapeHtml(video.uploader)}</span>
           </div>
         </div>
