@@ -368,7 +368,37 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 5. Handle other platforms via generic fallback
+    // 5. Handle Facebook Videos & Reels
+    if (cleanUrl.includes('facebook.com') || cleanUrl.includes('fb.watch')) {
+      let title = 'Facebook Video';
+      if (cleanUrl.includes('/reel/')) {
+        const match = cleanUrl.match(/\/reel\/([a-zA-Z0-9_-]+)/i);
+        title = match ? `Facebook Reel (${match[1]})` : 'Facebook Reel';
+      } else if (cleanUrl.includes('/watch') || cleanUrl.includes('fb.watch')) {
+        title = 'Facebook Watch Video';
+      }
+
+      return res.json({
+        title: title,
+        platform: 'Facebook',
+        platformType: 'fb',
+        count: 1,
+        videos: [{
+          id: `fb_${Date.now()}`,
+          title: title,
+          duration: null,
+          durationString: '--:--',
+          thumbnail: '',
+          uploader: 'Facebook Creator',
+          url: cleanUrl,
+          platform: 'Facebook',
+          platformType: 'fb',
+          index: 1
+        }]
+      });
+    }
+
+    // 6. Handle other platforms via generic fallback
     return res.json({
       title: `${platformInfo.name} Media`,
       platform: platformInfo.name,
