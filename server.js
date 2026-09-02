@@ -440,7 +440,7 @@ app.post('/api/playlist', async (req, res) => {
       '--ignore-errors',
       '--no-check-certificates',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android'
+      '--extractor-args', 'youtube:player_client=ios,mweb,android,web'
     ];
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
@@ -463,7 +463,7 @@ app.post('/api/playlist', async (req, res) => {
         '--ignore-errors',
         '--no-check-certificates',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        '--extractor-args', 'youtube:player_client=android'
+        '--extractor-args', 'youtube:player_client=ios,mweb,android,web'
       ];
       if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
         fallbackArgs.push('--cookies', LIMITS.COOKIES_PATH);
@@ -947,9 +947,12 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       '--no-playlist',
       '--no-check-certificates',
       '--no-warnings',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      '--extractor-args', 'youtube:player_client=android'
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
     ];
+
+    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') || videoUrl.startsWith('ytsearch')) {
+      args.push('--extractor-args', 'youtube:player_client=ios,mweb,android,web');
+    }
 
     if (LIMITS.COOKIES_PATH && fs.existsSync(LIMITS.COOKIES_PATH)) {
       args.push('--cookies', LIMITS.COOKIES_PATH);
@@ -959,7 +962,10 @@ function downloadSingleVideo(session, video, outputDir, format, quality, ffmpegA
       if (ffmpegStatic) {
         args.push('--ffmpeg-location', ffmpegStatic);
       }
-      args.push('--embed-thumbnail', '--add-metadata');
+      args.push('--add-metadata');
+      if (!videoUrl.includes('tiktok.com')) {
+        args.push('--embed-thumbnail');
+      }
     }
 
     if (format === 'mp3') {
