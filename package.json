@@ -8,6 +8,7 @@
     "dev": "node server.js"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "archiver": "^7.0.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

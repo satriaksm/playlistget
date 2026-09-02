@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/playlist",
+      "destination": "/api/playlist.js"
+    },
+    {
+      "source": "/api/download",
+      "destination": "/api/download.js"
+    },
+    {
+      "source": "/api/stream",
+      "destination": "/api/stream.js"
+    },
+    {
+      "source": "/api/check",
+      "destination": "/api/check.js"
+    },
+    {
+      "source": "/api/progress/:path*",
+      "destination": "/api/check.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/$1"
+    }
+  ]
+}

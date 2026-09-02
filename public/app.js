@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ---- Start Download ----
+  // ---- Start Download (Vercel Serverless + JSZip Edition) ----
   async function startDownload() {
     const selectedVideos = state.videos.filter(v => state.selectedIds.has(v.id));
     if (selectedVideos.length === 0) return;
@@ -434,112 +434,168 @@ document.addEventListener('DOMContentLoaded', () => {
     els.progressCount.textContent = `0 / ${selectedVideos.length}`;
     if (els.progressSpeed) els.progressSpeed.textContent = '-- MB/s';
     if (els.progressEta) els.progressEta.textContent = '--:--';
-    els.currentDownload.textContent = 'Initializing download session...';
+    els.currentDownload.textContent = 'Preparing download session...';
     els.progressLog.innerHTML = '';
 
-    try {
-      const res = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videos: selectedVideos,
-          format: state.format,
-          quality: state.quality,
-        }),
-      });
+    const downloadedTitles = [];
+    const errors = [];
+    const files = [];
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+    // Case 1: Single file download
+    if (selectedVideos.length === 1) {
+      const video = selectedVideos[0];
+      els.currentDownload.textContent = `Resolving: ${video.title}`;
+      els.progressBar.style.width = '50%';
+      els.progressPercent.textContent = '50%';
 
-      state.sessionId = data.sessionId;
-      startPolling();
-    } catch (err) {
-      hideSection(els.progressSection);
-      showError(err.message);
-    }
-  }
-
-  // ---- Progress Polling (Adaptive 1000ms) ----
-  function startPolling() {
-    if (state.pollingInterval) clearInterval(state.pollingInterval);
-
-    state.pollingInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/progress/${state.sessionId}`);
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: video.url,
+            format: state.format,
+            quality: state.quality,
+            title: video.title,
+            playUrl: video.playUrl,
+            musicUrl: video.musicUrl
+          })
+        });
+
         const data = await res.json();
-
-        if (data.error) return;
-
-        updateProgress(data);
-
-        if (data.status === 'completed') {
-          clearInterval(state.pollingInterval);
-          state.pollingInterval = null;
-          showComplete(data);
+        if (!res.ok || !data.downloadUrl) {
+          throw new Error(data.error || 'Failed to prepare download link');
         }
-      } catch {
-        // Ignore polling errors
+
+        els.progressBar.style.width = '100%';
+        els.progressPercent.textContent = '100%';
+        els.progressCount.textContent = `1 / 1`;
+        addLogEntry(`✓ ${video.title} — Ready for download`, 'success');
+
+        downloadedTitles.push(video.title);
+        const filename = data.filename || `${video.title}.${state.format}`;
+        files.push(filename);
+
+        state.directDownloadUrl = data.downloadUrl;
+        state.directFilename = filename;
+
+        // Auto trigger direct browser download
+        const a = document.createElement('a');
+        a.href = data.downloadUrl;
+        a.download = filename;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 1000);
+
+        showComplete({
+          completed: 1,
+          failed: 0,
+          totalVideos: 1,
+          downloadedTitles,
+          files,
+          downloadUrl: data.downloadUrl,
+          filename
+        });
+
+      } catch (err) {
+        hideSection(els.progressSection);
+        showError(err.message);
       }
-    }, 1000);
-  }
-
-  function updateProgress(data) {
-    const total = data.totalVideos || 0;
-    const done = (data.completed || 0) + (data.failed || 0);
-    const overallPercent = data.progress !== undefined ? data.progress : (total > 0 ? Math.round((done / total) * 100) : 0);
-    const filePercent = data.currentProgress ? Math.round(data.currentProgress) : 0;
-
-    els.progressBar.style.width = `${overallPercent}%`;
-    els.progressPercent.textContent = `${overallPercent}%`;
-    els.progressCount.textContent = `${done} / ${total}`;
-
-    if (els.progressSpeed) {
-      els.progressSpeed.textContent = data.currentSpeed || '-- MB/s';
-    }
-    if (els.progressEta) {
-      els.progressEta.textContent = data.currentEta ? `~${data.currentEta}` : '--:--';
+      return;
     }
 
-    if (data.currentVideo) {
-      if (filePercent > 0 && filePercent < 100) {
-        els.currentDownload.textContent = `Downloading (${filePercent}%): ${data.currentVideo}`;
-      } else {
-        els.currentDownload.textContent = `Processing: ${data.currentVideo}`;
+    // Case 2: Batch / Multiple Files (In-Browser JSZip Engine)
+    const zip = typeof JSZip !== 'undefined' ? new JSZip() : null;
+    let completedCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < selectedVideos.length; i++) {
+      const video = selectedVideos[i];
+      const percent = Math.round((i / selectedVideos.length) * 100);
+      els.progressBar.style.width = `${percent}%`;
+      els.progressPercent.textContent = `${percent}%`;
+      els.progressCount.textContent = `${i} / ${selectedVideos.length}`;
+      els.currentDownload.textContent = `[${i + 1}/${selectedVideos.length}] Downloading: ${video.title}`;
+
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: video.url,
+            format: state.format,
+            quality: state.quality,
+            title: video.title,
+            playUrl: video.playUrl,
+            musicUrl: video.musicUrl
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.downloadUrl) {
+          // Fetch media stream blob for ZIP packaging
+          const mediaRes = await fetch(data.downloadUrl);
+          if (mediaRes.ok) {
+            const blob = await mediaRes.blob();
+            const filename = data.filename || `${video.title}.${state.format}`;
+            if (zip) {
+              zip.file(filename, blob);
+            }
+            completedCount++;
+            downloadedTitles.push(video.title);
+            files.push(filename);
+            addLogEntry(`✓ [${i + 1}/${selectedVideos.length}] ${video.title} — Added to ZIP`, 'success');
+          } else {
+            throw new Error('Could not stream media');
+          }
+        } else {
+          throw new Error(data.error || 'Failed to resolve download link');
+        }
+      } catch (err) {
+        failedCount++;
+        errors.push({ video: video.title, error: err.message });
+        addLogEntry(`✗ [${i + 1}/${selectedVideos.length}] ${video.title} — ${err.message}`, 'error');
+      }
+    }
+
+    els.progressBar.style.width = '100%';
+    els.progressPercent.textContent = '100%';
+    els.progressCount.textContent = `${completedCount} / ${selectedVideos.length}`;
+
+    if (zip && completedCount > 0) {
+      els.currentDownload.textContent = 'Generating ZIP archive in browser...';
+      try {
+        const zipBlob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+          els.currentDownload.textContent = `Compressing ZIP: ${Math.round(metadata.percent)}%`;
+        });
+
+        state.generatedZipBlob = zipBlob;
+        state.generatedZipFilename = `playlist_${Date.now()}.zip`;
+
+        if (typeof saveAs !== 'undefined') {
+          saveAs(zipBlob, state.generatedZipFilename);
+        }
+
+        showComplete({
+          completed: completedCount,
+          failed: failedCount,
+          totalVideos: selectedVideos.length,
+          downloadedTitles,
+          files,
+          isClientZip: true
+        });
+      } catch (zipErr) {
+        showError('Failed to generate ZIP archive: ' + zipErr.message);
       }
     } else {
-      els.currentDownload.textContent = 'Processing media...';
-    }
-
-    // Update log
-    updateLog(data);
-  }
-
-  function updateLog(data) {
-    const existingEntries = els.progressLog.querySelectorAll('.log-entry').length;
-    const completed = data.completed;
-    const failed = data.failed;
-    const total = completed + failed;
-
-    // Only add new entries
-    if (total > existingEntries) {
-      // Check errors
-      if (data.errors.length > existingEntries - (completed > 0 ? completed - data.errors.length : 0)) {
-        const latestErrors = data.errors.slice(existingEntries > completed ? existingEntries - completed : 0);
-        latestErrors.forEach(err => {
-          addLogEntry(`✗ Failed: ${err.video}`, 'error');
-        });
-      }
-
-      // We'll just update the count display
-      if (completed > 0) {
-        const successCount = els.progressLog.querySelectorAll('.log-success').length;
-        if (successCount < completed) {
-          for (let i = successCount; i < completed; i++) {
-            const title = (data.downloadedTitles && data.downloadedTitles[i]) || 'Unknown';
-            addLogEntry(`✓ ${title} — Processed successfully`, 'success');
-          }
-        }
-      }
+      showComplete({
+        completed: completedCount,
+        failed: failedCount,
+        totalVideos: selectedVideos.length,
+        downloadedTitles,
+        files
+      });
     }
   }
 
@@ -573,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
       els.completeErrors.classList.add('hidden');
     }
 
-    if (data.completed === 1 && data.files && data.files.length === 1) {
+    if (data.completed === 1) {
       els.downloadZipBtn.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -596,36 +652,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---- Download ZIP or File ----
   function downloadZip() {
-    if (state.sessionId && state.downloadData) {
-      state.isDownloading = true;
-      const data = state.downloadData;
-      let url;
-      const singleFile = data.completed === 1 && data.files && data.files.length === 1 ? data.files[0] : null;
-
-      if (singleFile) {
-        url = `/api/download-file/${state.sessionId}/${encodeURIComponent(singleFile)}`;
-      } else {
-        url = `/api/download-zip/${state.sessionId}`;
+    if (state.generatedZipBlob) {
+      if (typeof saveAs !== 'undefined') {
+        saveAs(state.generatedZipBlob, state.generatedZipFilename || 'playlist.zip');
       }
+      return;
+    }
 
-      // Use invisible <a> to trigger download without page navigation
+    if (state.directDownloadUrl) {
       const a = document.createElement('a');
-      a.href = url;
-      if (singleFile) {
-        a.setAttribute('download', singleFile);
-      } else {
-        a.setAttribute('download', `playlist_${state.sessionId.substring(0, 8)}.zip`);
-      }
-      a.style.display = 'none';
+      a.href = state.directDownloadUrl;
+      a.download = state.directFilename || 'download.mp3';
+      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-
-      // Reset after giving the download enough time to start
-      setTimeout(() => {
-        state.isDownloading = false;
-        resetApp();
-      }, 3000);
+      setTimeout(() => a.remove(), 1000);
+      return;
     }
   }
 
